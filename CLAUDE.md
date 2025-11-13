@@ -4,17 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TerpTracker is a web application that analyzes cannabis strain terpene profiles and classifies them into SDP (Strain Data Project) categories. It scrapes product pages, parses COAs, and provides friendly summaries of terpene compositions.
+TerpTracker is a web application that analyzes cannabis strain terpene profiles and classifies them into SDP (Strain Data Project) categories. It uses multi-source data merging to combine page scraping, COA parsing, database lookups (50k+ strains), and API calls to provide the most complete terpene profiles possible.
 
 ## Tech Stack
 
 **Backend (FastAPI):**
 - FastAPI with async support
-- PostgreSQL for data storage
+- PostgreSQL for data storage (50k+ strain profiles: 32k dataset + 21k cached)
 - Redis for caching and rate limiting
 - Playwright for JS-rendered page scraping
-- Cannlytics API integration for COA parsing and strain data
+- Cannlytics API integration for COA parsing and strain data (active)
+- Public Dataset: Terpene Profile Parser (32,874 strains, auto-imported on first launch)
+- Multi-source data merging with priority-based conflict resolution
 - RapidFuzz for fuzzy strain name matching
+- **API Status**: Cannlytics (active) | Kushy (offline) | Otreeba (offline)
 
 **Frontend (Next.js):**
 - Next.js 14 with App Router
@@ -91,15 +94,24 @@ docker build -t terptracker-frontend ./frontend
 
 ## Architecture
 
-### Analysis Pipeline
+### Analysis Pipeline (Multi-Source Merging)
 
-The core analysis flow follows this sequence:
+The core analysis flow uses intelligent multi-source data collection and merging:
 
-1. **Scraper** (app/services/scraper.py): Playwright renders JS-heavy pages and extracts terpene data, COA links, and strain names using regex patterns
-2. **COA Parser** (app/services/cannlytics_client.py): If COA links found, parse with Cannlytics API for lab-quality data
-3. **Strain Fallback** (app/services/analyzer.py): If no data found, fuzzy-match strain name and query Cannlytics Strain Data API
-4. **Classifier** (app/services/classifier.py): Pure function classifies terpene profile into 6 SDP categories (BLUE/YELLOW/PURPLE/GREEN/ORANGE/RED)
-5. **Summary Generator**: Creates friendly one-liner based on category and terpene composition
+1. **Scraper** (app/services/scraper.py): Playwright renders JS-heavy pages and extracts terpene data, COA links, strain names, and cannabinoids using regex patterns
+2. **COA Parser** (app/services/cannlytics_client.py): If COA links found, ALWAYS attempts to parse with Cannlytics API for lab-quality data
+3. **Database Lookup** (app/services/profile_cache.py): ALWAYS checks PostgreSQL for cached strain profiles (50k+ strains)
+4. **Conditional API Call** (app/services/analyzer.py): If merged data has <5 terpenes OR is missing major cannabinoids (THC/CBD/CBG/CBN), queries Cannlytics Strain Data API
+5. **Data Merging** (app/services/analyzer.py): Intelligently merges all collected data with priority: **COA > Page > Database > API**
+   - `merge_terpene_data()` - Combines terpenes from all sources
+   - `merge_cannabinoid_data()` - Combines cannabinoids from all sources
+   - For each compound, uses highest priority source that has it
+   - Conflicts resolved automatically by priority
+6. **Classifier** (app/services/classifier.py): Pure function classifies merged terpene profile into 6 SDP categories (BLUE/YELLOW/PURPLE/GREEN/ORANGE/RED)
+7. **Summary Generator**: Creates friendly one-liner based on category and terpene composition
+8. **Database Caching**: Saves merged results back to PostgreSQL for future lookups
+
+**Response Format Change**: `source: str` → `sources: List[str]` to track all contributing sources (e.g., `["page", "database"]`)
 
 ### SDP Categories
 
@@ -116,8 +128,15 @@ Classification rules (from app/services/classifier.py):
 **Backend:**
 - `app/services/classifier.py` - Core SDP classification logic (pure function, easy to test)
 - `app/services/scraper.py` - Playwright-based page scraping with regex extraction
-- `app/services/analyzer.py` - Main orchestration service tying together scraping, COA, API fallback
-- `app/services/cannlytics_client.py` - Cannlytics API integration
+- `app/services/analyzer.py` - Main orchestration service with multi-source merging logic
+  - `merge_terpene_data()` - Merges terpenes from COA/page/database/API with priority
+  - `merge_cannabinoid_data()` - Merges cannabinoids with priority
+  - `is_data_complete()` - Checks if API supplementation needed
+- `app/services/cannlytics_client.py` - Cannlytics API integration (COA parsing + strain data)
+- `app/services/kushy_client.py` - Kushy API integration (currently offline)
+- `app/services/otreeba_client.py` - Otreeba API integration (currently offline)
+- `app/services/profile_cache.py` - PostgreSQL strain profile caching service
+- `app/data/init_datasets.py` - Automatic dataset download and import on first launch
 - `app/api/routes.py` - FastAPI endpoints: POST /api/analyze-url, GET /api/terpenes/{key}
 - `app/db/models.py` - SQLAlchemy models for extractions, profiles, terpene_defs, cache
 
@@ -139,8 +158,23 @@ PostgreSQL tables:
 
 ### Caching Strategy
 
-- Redis: 15-minute cache for analysis results, rate limiting state
-- PostgreSQL: Long-term storage of profiles and extraction history
+- **Redis**: 15-minute cache for analysis results, rate limiting state
+- **PostgreSQL**: Long-term storage of 50k+ strain profiles and extraction history
+  - 32,874 profiles from Terpene Profile Parser dataset (auto-imported on first launch)
+  - 21,000+ profiles from previous user searches (page scraping, COAs, APIs)
+  - Deduplication by normalized strain name
+  - Profiles include terpenes, cannabinoids, SDP category, and provenance metadata
+
+### Dataset Initialization
+
+On first Docker container launch, `app/data/init_datasets.py` automatically:
+1. Downloads Terpene Profile Parser CSV (7.4MB, 32,874 strains) from GitHub
+2. Parses lab test results for terpenes and cannabinoids
+3. Classifies each strain into SDP categories
+4. Imports into PostgreSQL `profiles` table
+5. Creates `.initialized` marker to prevent re-downloading
+
+**To force re-initialization:** Delete `backend/app/data/downloads/.initialized` and restart container
 
 ## Notes
 
@@ -149,3 +183,23 @@ PostgreSQL tables:
 - Do not make commits automatically
 - Classifier is a pure function - keep it that way for testability
 - Respect robots.txt when scraping; only scrape user-provided URLs
+
+## Data Sources & API Status
+
+**Active:**
+- ✅ Cannlytics API (COA parsing + strain data) - Requires API key
+- ✅ Terpene Profile Parser Dataset (32k strains) - Public GitHub dataset
+
+**Offline/Unavailable:**
+- ❌ Kushy API - Free strain database, went offline in 2025
+- ❌ Otreeba API - Commercial API, service appears unavailable (can't create accounts)
+
+**Looking for More Data Sources:**
+We're actively seeking additional cannabis strain databases and APIs. Many previously-available free APIs have gone offline, and commercial alternatives are scarce. If you find active terpene/cannabinoid data APIs or public datasets, please update this documentation and integrate them using the multi-source merging pattern in `analyzer.py`.
+
+**Integration Pattern:**
+1. Create client in `app/services/{api_name}_client.py` following existing patterns
+2. Add to API fallback chain in `analyzer.py` (lines 204-237)
+3. Update merge functions to include new source
+4. Add API status to environment variables
+5. Update documentation

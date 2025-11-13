@@ -6,7 +6,12 @@
       "Bash(docker-compose logs:*)",
       "Bash(curl:*)",
       "Bash(docker-compose restart:*)",
-      "Bash(docker-compose exec:*)"
+      "Bash(docker-compose exec:*)",
+      "Bash(python -m json.tool:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(docker-compose build:*)",
+      "WebSearch",
+      "Bash(docker exec:*)"
     ],
     "deny": [],
     "ask": []

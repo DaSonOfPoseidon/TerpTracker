@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for Playwright
+# Install system dependencies for Playwright + Xvfb for virtual display
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -23,6 +23,9 @@ RUN apt-get update && apt-get install -y \
     libcairo2 \
     libasound2 \
     libatspi2.0-0 \
+    xvfb \
+    x11vnc \
+    x11-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -32,11 +35,18 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Install Playwright browsers (without dependencies since we installed them manually)
 RUN playwright install chromium
 
+# Copy entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Copy application code
 COPY . .
 
 # Expose port
 EXPOSE 8000
 
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Set display environment variable
+ENV DISPLAY=:99
+
+# Run the application with Xvfb
+CMD ["/app/entrypoint.sh"]

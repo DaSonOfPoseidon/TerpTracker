@@ -10,7 +10,7 @@ Categories:
 - RED: Myrcene + Limonene + Caryophyllene in roughly equal amounts; low Pinene/Humulene
 """
 
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 
 # Category descriptions for summaries
 CATEGORY_DESCRIPTIONS = {
@@ -166,3 +166,62 @@ def generate_summary(strain_name: str, category: str, terpenes: Dict[str, float]
         terp_detail = ""
 
     return f"{strain_name}'s composition puts it in the {category} category — expect {description}{terp_detail}."
+
+def generate_cannabinoid_insights(totals) -> List[str]:
+    """
+    Generate insights from cannabinoid ratios.
+
+    Args:
+        totals: Totals object with cannabinoid data
+
+    Returns:
+        List of insight strings
+    """
+    insights = []
+
+    # Get effective THC and CBD (accounting for acid forms)
+    thc_total = (totals.thc or 0) + (totals.thca or 0) * 0.877  # THCA decarboxylation factor
+    cbd_total = (totals.cbd or 0) + (totals.cbda or 0) * 0.877  # CBDA decarboxylation factor
+
+    # THC:CBD ratio insights
+    if thc_total > 0 and cbd_total > 0:
+        ratio = thc_total / cbd_total
+        if ratio > 20:
+            insights.append(f"THC-dominant ({ratio:.0f}:1 ratio)")
+        elif ratio > 5:
+            insights.append(f"High THC ({ratio:.0f}:1 ratio)")
+        elif ratio > 2:
+            insights.append(f"THC-leaning ({ratio:.1f}:1 ratio)")
+        elif ratio > 0.5:
+            insights.append(f"Balanced THC:CBD ({ratio:.1f}:1 ratio)")
+        else:
+            insights.append(f"CBD-rich (1:{1/ratio:.1f} ratio)")
+    elif thc_total > 0:
+        insights.append("THC-dominant, minimal CBD")
+    elif cbd_total > 0:
+        insights.append("CBD-dominant, minimal THC")
+
+    # Potency insights
+    if thc_total > 25:
+        insights.append("Very high potency")
+    elif thc_total > 20:
+        insights.append("High potency")
+    elif thc_total > 15:
+        insights.append("Moderate-high potency")
+    elif thc_total > 10:
+        insights.append("Moderate potency")
+
+    # Minor cannabinoid insights
+    if totals.cbn and totals.cbn > 0.005:  # >0.5%
+        insights.append("Elevated CBN may promote sleepiness")
+
+    if totals.cbg and totals.cbg > 0.01:  # >1%
+        insights.append("Notable CBG presence")
+
+    if totals.thcv and totals.thcv > 0.005:  # >0.5%
+        insights.append("Contains THCV")
+
+    if totals.cbdv and totals.cbdv > 0.005:  # >0.5%
+        insights.append("Contains CBDV")
+
+    return insights

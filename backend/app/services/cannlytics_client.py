@@ -131,45 +131,114 @@ class CannlyticsClient:
         Returns:
             StrainAPIData with average terpene profile, or None if not found
         """
-        if not self.api_key:
-            return None
-
         try:
+            import urllib.parse
+
+            # URL encode the strain name
+            encoded_name = urllib.parse.quote_plus(strain_name)
+
             async with httpx.AsyncClient(timeout=15.0) as client:
-                # Cannlytics strain data endpoint
-                response = await client.get(
-                    f"{self.base_url}/strains",
-                    params={"name": strain_name},
-                    headers=self.headers
-                )
+                # Cannlytics strain data endpoint (no auth required for public data)
+                url = f"https://cannlytics.com/api/data/strains/{encoded_name}"
+                print(f"Fetching strain data from: {url}")
+
+                response = await client.get(url)
 
                 if response.status_code != 200:
+                    print(f"Strain API returned status {response.status_code}")
                     return None
 
-                data = response.json()
+                result = response.json()
+                print(f"Strain API response: {list(result.keys()) if isinstance(result, dict) else 'not a dict'}")
 
-                if not data or "strains" not in data or not data["strains"]:
+                # Response format: {"data": {...}}
+                if not result or "data" not in result:
+                    print("No 'data' key in response")
                     return None
 
-                # Take first result
-                strain = data["strains"][0]
+                strain = result["data"]
+
+                # DEBUG: Print full strain data to see what's available
+                import json
+                print(f"DEBUG: Full strain data from Cannlytics:")
+                print(json.dumps(strain, indent=2, default=str)[:2000])  # Limit to 2000 chars
 
                 # Extract terpene averages
                 terpenes = {}
-                terpene_data = strain.get("terpenes", {})
 
-                for terp_key, terp_value in terpene_data.items():
-                    # Normalize key names
-                    std_key = terp_key.lower().replace("-", "_").replace(" ", "_")
-                    if terp_value is not None:
-                        terpenes[std_key] = float(terp_value)
+                # Cannlytics API returns terpenes as direct fields on the strain object
+                # Map their field names to our standard names
+                terpene_mapping = {
+                    'beta_myrcene': 'myrcene',
+                    'myrcene': 'myrcene',
+                    'd_limonene': 'limonene',
+                    'limonene': 'limonene',
+                    'beta_caryophyllene': 'caryophyllene',
+                    'caryophyllene': 'caryophyllene',
+                    'alpha_pinene': 'alpha_pinene',
+                    'beta_pinene': 'beta_pinene',
+                    'terpinolene': 'terpinolene',
+                    'humulene': 'humulene',
+                    'linalool': 'linalool',
+                    'ocimene': 'ocimene',
+                }
 
-                if not terpenes:
+                for api_key, std_key in terpene_mapping.items():
+                    if api_key in strain and strain[api_key] is not None:
+                        try:
+                            value = float(strain[api_key])
+                            # Cannlytics returns percentages as decimals already (e.g., 0.26 = 0.26%)
+                            # We need them as fractions (e.g., 0.0026 = 0.26%)
+                            if value > 0:
+                                terpenes[std_key] = value / 100
+                        except (ValueError, TypeError):
+                            pass
+
+                # Extract cannabinoid data
+                totals = Totals()
+                cannabinoid_mapping = {
+                    'thc': 'thc',
+                    'delta_9_thc': 'thc',  # Use delta-9 if regular THC not present
+                    'thca': 'thca',
+                    'thcv': 'thcv',
+                    'cbd': 'cbd',
+                    'cbda': 'cbda',
+                    'cbdv': 'cbdv',
+                    'cbn': 'cbn',
+                    'cbg': 'cbg',
+                    'cbgm': 'cbgm',
+                    'cbgv': 'cbgv',
+                    'cbc': 'cbc',
+                    'cbcv': 'cbcv',
+                    'cbv': 'cbv',
+                    'cbe': 'cbe',
+                    'cbt': 'cbt',
+                    'cbl': 'cbl',
+                    'total_terpenes': 'total_terpenes',
+                }
+
+                for api_key, std_key in cannabinoid_mapping.items():
+                    if api_key in strain and strain[api_key] is not None:
+                        try:
+                            value = float(strain[api_key])
+                            # Cannlytics returns percentages as decimals (e.g., 18.13 = 18.13%)
+                            # We need them as fractions (e.g., 0.1813 = 18.13%)
+                            if value > 0:
+                                setattr(totals, std_key, value / 100 if value > 1 else value)
+                        except (ValueError, TypeError):
+                            pass
+
+                # Return data even if no terpenes found (cannabinoids might be present)
+                if not terpenes and not any([totals.thc, totals.cbd, totals.cbn, totals.cbg]):
+                    print("No terpene or cannabinoid data found in strain response")
                     return None
 
+                print(f"Extracted {len(terpenes)} terpenes and cannabinoid data from API")
+
                 return StrainAPIData(
-                    strain_name=strain.get("name", strain_name),
+                    strain_name=strain.get("strain_name") or strain.get("name", strain_name),
                     terpenes=terpenes,
+                    totals=totals,
                     match_score=1.0,  # Exact match assumed
                     source="cannlytics"
                 )

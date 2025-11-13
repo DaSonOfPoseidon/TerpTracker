@@ -86,3 +86,36 @@ backend/alembic/versions/*.pyc
 # Playwright
 playwright/.cache/
 .playwright/
+
+# Claude AI settings (keep commands but ignore local settings)
+.claude/settings.local.json
+.claude/.cache/
+
+# Playwright browsers and artifacts
+test-results/
+playwright-report/
+.playwright-screenshots/
+browser-contexts/
+.browsers/
+
+# X11 and Xvfb
+.X*-lock
+/tmp/.X*-lock
+
+# Redis
+dump.rdb
+appendonly.aof
+
+# PostgreSQL
+postgres-data/
+pgdata/
+
+# API caches
+.api-cache/
+
+# Screenshots and debug artifacts
+screenshots/
+debug-screenshots/
+
+# Dataset downloads
+backend/app/data/downloads/

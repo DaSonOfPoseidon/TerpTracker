@@ -4,9 +4,12 @@ A web application that analyzes cannabis strain terpene profiles and classifies 
 
 ## Features
 
+- **Multi-Source Data Merging**: Intelligently combines data from page scraping, COAs, local database (32k+ strains), and APIs to provide the most complete profile possible
+- **Automatic Dataset Initialization**: On first launch, downloads and imports 32,874 lab-tested strain profiles from public datasets
 - **Intelligent Extraction**: Uses Playwright to render JavaScript-heavy product pages and extract terpene data
 - **COA Parsing**: Automatically detects and parses Certificate of Analysis documents using the Cannlytics API
-- **Strain Database Fallback**: Falls back to Cannlytics Strain Data API with fuzzy name matching when on-page data isn't available
+- **PostgreSQL-Backed Database**: 21k+ cached strain profiles from previous searches, supplemented by 32k+ dataset strains
+- **Smart API Supplementation**: Conditionally queries external APIs (Cannlytics) only when local data is incomplete
 - **SDP Classification**: Categorizes strains into 6 color-coded categories (BLUE, YELLOW, PURPLE, GREEN, ORANGE, RED)
 - **Mobile-First PWA**: Installable progressive web app optimized for mobile devices
 - **Caching & Rate Limiting**: Redis-powered caching and rate limiting for optimal performance
@@ -27,11 +30,13 @@ TerpTracker classifies strains based on their dominant terpene profiles:
 
 ### Backend
 - **FastAPI** - Modern async Python web framework
-- **PostgreSQL** - Data storage for profiles and extractions
+- **PostgreSQL** - Data storage for 50k+ strain profiles, extractions, and cache
 - **Redis** - Caching and rate limiting
 - **Playwright** - Headless browser for JS-rendered pages
-- **Cannlytics API** - COA parsing and strain data
+- **Cannlytics API** - COA parsing and strain data (active)
+- **Public Datasets** - Terpene Profile Parser (32k+ lab-tested strains, auto-imported)
 - **RapidFuzz** - Fuzzy string matching for strain names
+- **Multi-Source Merging** - Intelligent data combination with priority-based conflict resolution
 
 ### Frontend
 - **Next.js 14** - React framework with App Router
@@ -131,26 +136,38 @@ Analyze a product URL and extract terpene profile.
 **Response:**
 ```json
 {
-  "source": "coa",
+  "sources": ["coa", "page", "database"],
   "terpenes": {
     "myrcene": 0.8,
     "limonene": 0.5,
-    "caryophyllene": 0.4
+    "caryophyllene": 0.4,
+    "alpha_pinene": 0.3,
+    "humulene": 0.2
   },
   "totals": {
     "total_terpenes": 2.1,
-    "thca": 23.4
+    "thc": 0.72,
+    "thca": 0.234
   },
   "category": "BLUE",
-  "summary": "Strain's composition puts it in the BLUE category — expect myrcene-forward with an earthy, relaxing profile.",
+  "summary": "Blue Dream's composition puts it in the BLUE category — expect myrcene-forward with an earthy, relaxing profile.",
   "strain_guess": "Blue Dream",
   "evidence": {
     "detection_method": "coa_parse",
     "coa_url": "https://example.com/coa.pdf",
     "coa_lab": "Genesis Testing Labs"
+  },
+  "data_available": {
+    "has_terpenes": true,
+    "has_cannabinoids": true,
+    "has_coa": true,
+    "terpene_count": 5,
+    "cannabinoid_count": 2
   }
 }
 ```
+
+**Note**: The `sources` array shows all data sources that contributed to the result. Data is merged with priority: COA > Page > Database > API.
 
 ### `GET /api/terpenes/{key}`
 Get detailed information about a specific terpene.
@@ -184,22 +201,37 @@ docker-compose -f docker-compose.prod.yml up -d
 **Backend (.env):**
 - `DATABASE_URL` - PostgreSQL connection string
 - `REDIS_URL` - Redis connection string
-- `CANNLYTICS_API_KEY` - Your Cannlytics API key
-- `OTREEBA_API_KEY` - (Optional) Otreeba API key
+- `CANNLYTICS_API_KEY` - Your Cannlytics API key (required for COA parsing and strain data API)
+- `OTREEBA_API_KEY` - (Optional, currently offline) Otreeba API key
 - `RATE_LIMIT_PER_MINUTE` - Rate limit (default: 30)
+
+**Note on Dataset Initialization:**
+On first container launch, TerpTracker automatically downloads and imports the Terpene Profile Parser dataset (32,874 lab-tested strain profiles, ~7.4MB) from GitHub. This creates a `.initialized` marker file in `backend/app/data/downloads/` to prevent re-downloading on subsequent launches.
 
 **Frontend (.env):**
 - `NEXT_PUBLIC_API_URL` - Backend API URL
 
 ## Architecture
 
-### Analysis Pipeline
+### Analysis Pipeline (Multi-Source Merging)
 
-1. **Page Scraping**: Playwright renders the page and extracts terpene data, COA links, and strain names
-2. **COA Detection**: If COA links are found, parse them using Cannlytics API for lab-quality data
-3. **API Fallback**: If no data found, fuzzy-match the strain name and query Cannlytics Strain Data API
-4. **Classification**: Pure function classifies terpene profile into one of 6 SDP categories
-5. **Summary Generation**: Creates a friendly one-liner based on category and composition
+TerpTracker uses an intelligent multi-source data collection and merging strategy to provide the most complete terpene profiles:
+
+1. **Page Scraping**: Playwright renders the page and extracts terpene data, COA links, strain names, and cannabinoids
+2. **COA Parsing**: If COA links found, always attempts to parse them using Cannlytics API for lab-quality data
+3. **Database Lookup**: Always checks PostgreSQL database for cached strain profiles (50k+ strains including 32k from public datasets)
+4. **Conditional API Supplementation**: If merged data has <5 terpenes or is missing major cannabinoids, queries Cannlytics Strain Data API
+5. **Intelligent Merging**: Combines all collected data with priority: **COA > Page > Database > API**
+   - For each terpene/cannabinoid, uses the highest priority source
+   - Conflicts automatically resolved by priority
+6. **Classification**: Pure function classifies merged terpene profile into one of 6 SDP categories
+7. **Summary Generation**: Creates friendly one-liner based on category and composition
+8. **Database Caching**: Saves merged results back to database for future lookups
+
+**Example Multi-Source Result:**
+- Page scraping finds 3 terpenes + cannabinoids
+- Database has complete 8-terpene profile for same strain
+- System merges both → returns all 8 terpenes with `sources: ["page", "database"]`
 
 ### Directory Structure
 
@@ -249,11 +281,37 @@ For issues and questions:
 - Check existing issues for solutions
 - Review the documentation in `CLAUDE.md`
 
+## Data Sources & APIs
+
+TerpTracker combines multiple data sources to provide comprehensive strain information:
+
+### Active Sources
+- ✅ **Cannlytics API** - COA parsing and strain data (active, requires API key)
+- ✅ **Terpene Profile Parser Dataset** - 32,874 lab-tested strains (public, auto-imported)
+- ✅ **Local PostgreSQL Database** - 50k+ cached strain profiles from all sources
+
+### Offline/Unavailable Sources
+- ❌ **Kushy API** - Previously free strain database (currently offline as of 2025)
+- ❌ **Otreeba API** - Commercial strain data API (service appears offline, can't create accounts)
+
+### Looking for More Data Sources
+
+We're actively interested in integrating additional cannabis strain databases and APIs but have found limited options. Many previously-available free APIs have gone offline, and commercial alternatives are scarce or cost-prohibitive.
+
+**If you know of active cannabis strain data APIs or public datasets**, please open an issue or PR! We're particularly interested in:
+- Terpene profile databases (lab-tested data preferred)
+- Cannabinoid analysis datasets
+- Strain genetics/lineage information
+- Commercial dispensary APIs with batch-specific COA data
+
 ## Roadmap
 
+- [x] Multi-source data merging
+- [x] Automatic dataset initialization
 - [ ] QR code detection and parsing for COAs
+- [ ] Additional data sources integration (seeking active APIs)
 - [ ] Bulk strain analysis
 - [ ] User accounts and saved analyses
-- [ ] Additional data sources integration
 - [ ] Mobile app (React Native)
 - [ ] Advanced filtering and search
+- [ ] Strain recommendation engine

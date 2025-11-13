@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from app.models.schemas import AnalyzeUrlRequest, AnalyzeUrlResponse, TerpeneInfo
 from app.services.analyzer import StrainAnalyzer
 from app.services.cache import cache_service
+from app.services.cannlytics_client import CannlyticsClient
+from app.services.classifier import classify_terpene_profile, generate_summary, generate_cannabinoid_insights
 import hashlib
 
 router = APIRouter()
@@ -125,3 +127,39 @@ async def list_terpenes():
 @router.get("/version")
 async def get_version():
     return {"version": "0.1.0", "api": "TerpTracker"}
+
+@router.get("/test-strain/{strain_name}")
+async def test_strain_lookup(strain_name: str):
+    """
+    Test endpoint: Look up a strain directly by name using Cannlytics API.
+    Bypasses scraping to verify API integration and classification pipeline.
+    """
+    try:
+        client = CannlyticsClient()
+        strain_data = await client.get_strain_data(strain_name)
+
+        if not strain_data:
+            raise HTTPException(status_code=404, detail=f"Strain '{strain_name}' not found in Cannlytics database")
+
+        # Classify the terpene profile
+        category = classify_terpene_profile(strain_data.terpenes) if strain_data.terpenes else None
+        summary = generate_summary(strain_data.strain_name, category, strain_data.terpenes) if category else f"{strain_data.strain_name} - Data from Cannlytics API"
+
+        # Generate cannabinoid insights
+        cannabinoid_insights = generate_cannabinoid_insights(strain_data.totals)
+
+        return {
+            "strain_name": strain_data.strain_name,
+            "terpenes": strain_data.terpenes,
+            "totals": strain_data.totals.model_dump(),
+            "category": category,
+            "summary": summary,
+            "cannabinoid_insights": cannabinoid_insights,
+            "source": "cannlytics_api",
+            "match_score": strain_data.match_score
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lookup failed: {str(e)}")

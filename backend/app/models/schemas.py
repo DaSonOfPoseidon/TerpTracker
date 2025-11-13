@@ -20,10 +20,24 @@ class TerpeneProfile(BaseModel):
 
 class Totals(BaseModel):
     total_terpenes: Optional[float] = None
+    # Major cannabinoids
     thc: Optional[float] = None
     thca: Optional[float] = None
+    thcv: Optional[float] = None
     cbd: Optional[float] = None
     cbda: Optional[float] = None
+    cbdv: Optional[float] = None
+    # Minor cannabinoids
+    cbn: Optional[float] = None
+    cbg: Optional[float] = None
+    cbgm: Optional[float] = None
+    cbgv: Optional[float] = None
+    cbc: Optional[float] = None
+    cbcv: Optional[float] = None
+    cbv: Optional[float] = None
+    cbe: Optional[float] = None
+    cbt: Optional[float] = None
+    cbl: Optional[float] = None
 
 # Evidence/Provenance models
 class Evidence(BaseModel):
@@ -36,18 +50,28 @@ class Evidence(BaseModel):
     match_score: Optional[float] = None  # For fuzzy name matching
     raw_data: Optional[Dict] = None
 
+# Data availability tracking
+class DataAvailability(BaseModel):
+    has_terpenes: bool = False
+    has_cannabinoids: bool = False
+    has_coa: bool = False
+    terpene_count: int = 0
+    cannabinoid_count: int = 0
+
 # Request/Response models
 class AnalyzeUrlRequest(BaseModel):
     url: HttpUrl
 
 class AnalyzeUrlResponse(BaseModel):
-    source: str = Field(..., description="Data source: 'page' | 'coa' | 'api'")
-    terpenes: Dict[str, float] = Field(..., description="Terpene profile with percentages")
-    totals: Totals = Field(..., description="Total terpenes and cannabinoids")
-    category: str = Field(..., description="SDP category: BLUE|YELLOW|PURPLE|GREEN|ORANGE|RED")
-    summary: str = Field(..., description="Friendly one-liner about the profile")
+    sources: List[str] = Field(..., description="Data sources used (in priority order): ['coa', 'page', 'database', 'api']")
+    terpenes: Dict[str, float] = Field(default_factory=dict, description="Merged terpene profile with percentages from all sources")
+    totals: Totals = Field(default_factory=Totals, description="Merged total terpenes and cannabinoids from all sources")
+    category: Optional[str] = Field(None, description="SDP category: BLUE|YELLOW|PURPLE|GREEN|ORANGE|RED (null if no terpene data)")
+    summary: str = Field(..., description="Friendly summary about the profile")
     strain_guess: str = Field(..., description="Normalized strain name")
     evidence: Evidence = Field(..., description="Source and detection metadata")
+    data_available: DataAvailability = Field(default_factory=DataAvailability, description="What data was found")
+    cannabinoid_insights: List[str] = Field(default_factory=list, description="Insights from cannabinoid ratios")
 
 class TerpeneInfo(BaseModel):
     key: str
@@ -76,5 +100,6 @@ class COAData(BaseModel):
 class StrainAPIData(BaseModel):
     strain_name: str
     terpenes: Dict[str, float]
+    totals: Totals = Totals()
     match_score: float
     source: str  # 'cannlytics' | 'otreeba'
