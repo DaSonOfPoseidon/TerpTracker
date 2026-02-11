@@ -23,16 +23,16 @@ export function TerpenePanel() {
   }, [])
 
   if (loading) {
-    return <div className="text-sm text-gray-500">Loading terpene information...</div>
+    return <div className="text-sm text-muted-foreground">Loading terpene information...</div>
   }
 
   if (error) {
-    return <div className="text-sm text-red-500">Failed to load terpene information: {error}</div>
+    return <div className="text-sm text-destructive">Failed to load terpene information: {error}</div>
   }
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">
+      <h3 className="text-sm font-semibold text-botanical-sage uppercase tracking-wide mb-3">
         Learn More About Terpenes
       </h3>
 
@@ -43,26 +43,27 @@ export function TerpenePanel() {
               {terpene.name}
             </AccordionTrigger>
             <AccordionContent>
-              <div className="space-y-2 text-sm text-gray-700">
+              <div className="space-y-2 text-sm text-foreground/80">
                 {terpene.description && <p>{terpene.description}</p>}
 
                 {terpene.aroma && (
                   <div>
-                    <span className="font-semibold">Aroma:</span> {terpene.aroma}
+                    <span className="font-semibold text-foreground">Aroma:</span>{" "}
+                    <span className="text-muted-foreground">{terpene.aroma}</span>
                   </div>
                 )}
 
                 {terpene.effects && terpene.effects.length > 0 && (
                   <div>
-                    <span className="font-semibold">Effects:</span>{" "}
-                    {terpene.effects.join(", ")}
+                    <span className="font-semibold text-foreground">Effects:</span>{" "}
+                    <span className="text-muted-foreground">{terpene.effects.join(", ")}</span>
                   </div>
                 )}
 
                 {terpene.also_found_in && terpene.also_found_in.length > 0 && (
                   <div>
-                    <span className="font-semibold">Also found in:</span>{" "}
-                    {terpene.also_found_in.join(", ")}
+                    <span className="font-semibold text-foreground">Also found in:</span>{" "}
+                    <span className="text-muted-foreground">{terpene.also_found_in.join(", ")}</span>
                   </div>
                 )}
               </div>

@@ -6,16 +6,15 @@ interface TerpeneChipProps {
 }
 
 export function TerpeneChip({ name, value }: TerpeneChipProps) {
-  // Format name for display
   const displayName = name
     .replace(/_/g, "-")
-    .replace(/^alpha-/, "α-")
-    .replace(/^beta-/, "β-")
+    .replace(/^alpha-/, "\u03b1-")
+    .replace(/^beta-/, "\u03b2-")
 
   return (
-    <div className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+    <div className="inline-flex items-center gap-2 bg-botanical-leaf/15 text-botanical-sage border border-botanical-leaf/25 px-3 py-1 rounded-full text-sm font-medium">
       <span className="capitalize">{displayName}</span>
-      <span className="font-bold">{formatPercent(value)}</span>
+      <span className="font-bold text-foreground">{formatPercent(value)}</span>
     </div>
   )
 }

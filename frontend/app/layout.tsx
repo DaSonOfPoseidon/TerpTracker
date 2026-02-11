@@ -1,14 +1,27 @@
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Cormorant_Garamond, Source_Sans_3 } from "next/font/google"
+import { NavBar } from "@/components/NavBar"
 import "./globals.css"
 
-const inter = Inter({ subsets: ["latin"] })
+const cormorant = Cormorant_Garamond({
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
+  variable: "--font-cormorant",
+  display: "swap",
+})
+
+const sourceSans = Source_Sans_3({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-source-sans",
+  display: "swap",
+})
 
 export const metadata: Metadata = {
   title: "TerpTracker - Cannabis Terpene Profile Analyzer",
   description: "Analyze cannabis strain terpene profiles and get SDP category classifications",
   manifest: "/manifest.json",
-  themeColor: "#10B981",
+  themeColor: "#121916",
   viewport: {
     width: "device-width",
     initialScale: 1,
@@ -22,9 +35,10 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
+    <html lang="en" className={`${cormorant.variable} ${sourceSans.variable}`}>
+      <body>
+        <div className="botanical-bg">
+          <NavBar />
           {children}
         </div>
       </body>

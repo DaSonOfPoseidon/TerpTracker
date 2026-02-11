@@ -1,15 +1,15 @@
 "use client"
 
+import Link from "next/link"
 import { AnalysisResult } from "@/lib/types"
 import { categoryColors, formatPercent } from "@/lib/utils"
 import { sdpCategories } from "@/lib/sdp-categories"
 import { TerpeneChip } from "./TerpeneChip"
 import { SourceBadge } from "./SourceBadge"
-import { TerpenePanel } from "./TerpenePanel"
 import { TerpeneRadarChart } from "./TerpeneRadarChart"
-import { CategoryDetails } from "./CategoryDetails"
 import { DataQualityIndicator } from "./DataQualityIndicator"
 import { CannabinoidInsights } from "./CannabinoidInsights"
+import { BookOpen } from "lucide-react"
 
 interface ResultCardProps {
   result: AnalysisResult
@@ -19,7 +19,7 @@ function StatField({ label, value }: { label: string; value: number | undefined 
   if (value === undefined) return null
   return (
     <div>
-      <span className="text-gray-600">{label}:</span>{" "}
+      <span className="text-muted-foreground">{label}:</span>{" "}
       <span className="font-semibold">{formatPercent(value)}</span>
     </div>
   )
@@ -30,28 +30,26 @@ export function ResultCard({ result }: ResultCardProps) {
   const sdp = sdpCategories[result.category]
 
   return (
-    <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+    <div className="bg-card border border-border rounded-lg overflow-hidden">
       {/* Header with category */}
       <div className={`${categoryColor} px-6 py-4`}>
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold">{result.strain_guess}</h2>
-          <span className="text-sm font-medium px-3 py-1 bg-white/20 rounded-full">
+          <span className="text-sm font-medium px-3 py-1 bg-black/20 rounded-full">
             {result.category}
           </span>
         </div>
       </div>
 
       {/* Summary */}
-      <div className="px-6 py-4 border-b">
-        <p className="text-gray-700 leading-relaxed">{result.summary}</p>
+      <div className="px-6 py-4">
+        <p className="text-foreground/80 leading-relaxed">{result.summary}</p>
       </div>
-
-      {/* Category Details - SDP explanation */}
-      <CategoryDetails category={result.category} terpenes={result.terpenes} />
+      <hr className="leaf-divider" />
 
       {/* Terpenes */}
-      <div className="px-6 py-4 border-b">
-        <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">
+      <div className="px-6 py-4">
+        <h3 className="text-sm font-semibold text-botanical-sage uppercase tracking-wide mb-3">
           Terpene Profile
         </h3>
         <div className="flex flex-wrap gap-2">
@@ -62,20 +60,24 @@ export function ResultCard({ result }: ResultCardProps) {
             ))}
         </div>
       </div>
+      <hr className="leaf-divider" />
 
       {/* Radar Chart */}
       {sdp && (
-        <div className="py-4 border-b">
-          <TerpeneRadarChart
-            terpenes={result.terpenes}
-            categoryColor={sdp.color}
-          />
-        </div>
+        <>
+          <div className="py-4">
+            <TerpeneRadarChart
+              terpenes={result.terpenes}
+              categoryColor={sdp.color}
+            />
+          </div>
+          <hr className="leaf-divider" />
+        </>
       )}
 
       {/* Totals */}
-      <div className="px-6 py-4 border-b bg-gray-50">
-        <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">
+      <div className="px-6 py-4 bg-secondary/30">
+        <h3 className="text-sm font-semibold text-botanical-sage uppercase tracking-wide mb-3">
           Totals
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
@@ -86,8 +88,8 @@ export function ResultCard({ result }: ResultCardProps) {
         </div>
 
         {result.totals.total_terpenes !== undefined && result.totals.thca !== undefined && (
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-            <p className="text-xs text-blue-900">
+          <div className="mt-4 p-3 bg-botanical-leaf/15 border border-botanical-leaf/25 rounded-md">
+            <p className="text-xs text-botanical-sage">
               <span className="font-semibold">Rosin-ability (experimental):</span> This strain
               shows {formatPercent(result.totals.total_terpenes)} total terpenes and{" "}
               {formatPercent(result.totals.thca)} THCa. Higher values may indicate better rosin
@@ -96,14 +98,18 @@ export function ResultCard({ result }: ResultCardProps) {
           </div>
         )}
       </div>
+      <hr className="leaf-divider" />
 
       {/* Cannabinoid Insights */}
       {result.cannabinoid_insights && result.cannabinoid_insights.length > 0 && (
-        <CannabinoidInsights insights={result.cannabinoid_insights} />
+        <>
+          <CannabinoidInsights insights={result.cannabinoid_insights} />
+          <hr className="leaf-divider" />
+        </>
       )}
 
       {/* Source + Data Quality */}
-      <div className="px-6 py-4 border-b space-y-3">
+      <div className="px-6 py-4 space-y-3">
         <SourceBadge
           sources={result.sources}
           source={result.source}
@@ -113,25 +119,28 @@ export function ResultCard({ result }: ResultCardProps) {
           <DataQualityIndicator data={result.data_available} />
         )}
       </div>
-
-      {/* Learn More */}
-      <div className="px-6 py-4 border-t bg-gray-50">
-        <TerpenePanel />
-      </div>
+      <hr className="leaf-divider" />
 
       {/* SDP Attribution Footer */}
-      <div className="px-6 py-3 border-t bg-gray-50 text-center">
-        <p className="text-xs text-gray-400">
+      <div className="px-6 py-3 text-center flex items-center justify-center gap-4">
+        <p className="text-xs text-muted-foreground">
           Classification by{" "}
           <a
             href="https://straindataproject.org/"
             target="_blank"
             rel="noopener noreferrer"
-            className="underline hover:text-gray-600"
+            className="underline hover:text-primary"
           >
             Strain Data Project
           </a>
         </p>
+        <Link
+          href="/learn"
+          className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+        >
+          <BookOpen className="h-3 w-3" />
+          Learn more
+        </Link>
       </div>
     </div>
   )

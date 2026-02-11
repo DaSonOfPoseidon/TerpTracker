@@ -25,10 +25,10 @@ const RadarChartInner = dynamic(
         return (
           <ResponsiveContainer width="100%" height={300}>
             <RadarChart data={data} cx="50%" cy="50%" outerRadius="70%">
-              <PolarGrid stroke="#e5e7eb" />
+              <PolarGrid stroke="#2D3532" />
               <PolarAngleAxis
                 dataKey="terpene"
-                tick={{ fontSize: 11, fill: "#4b5563" }}
+                tick={{ fontSize: 11, fill: "#7A8B6F" }}
               />
               <Radar
                 dataKey="value"
@@ -44,7 +44,7 @@ const RadarChartInner = dynamic(
 
       return Chart
     }),
-  { ssr: false, loading: () => <div className="h-[300px]" /> }
+  { ssr: false, loading: () => <div className="h-[300px] bg-secondary/30 rounded animate-pulse" /> }
 )
 
 export function TerpeneRadarChart({
@@ -68,7 +68,7 @@ export function TerpeneRadarChart({
 
   return (
     <div className="w-full">
-      <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2 px-6">
+      <h3 className="text-sm font-semibold text-botanical-sage uppercase tracking-wide mb-2 px-6">
         Strain Compass
       </h3>
       <RadarChartInner data={data} categoryColor={categoryColor} />
