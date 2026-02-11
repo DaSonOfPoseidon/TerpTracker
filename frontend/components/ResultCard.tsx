@@ -2,9 +2,14 @@
 
 import { AnalysisResult } from "@/lib/types"
 import { categoryColors, formatPercent } from "@/lib/utils"
+import { sdpCategories } from "@/lib/sdp-categories"
 import { TerpeneChip } from "./TerpeneChip"
 import { SourceBadge } from "./SourceBadge"
 import { TerpenePanel } from "./TerpenePanel"
+import { TerpeneRadarChart } from "./TerpeneRadarChart"
+import { CategoryDetails } from "./CategoryDetails"
+import { DataQualityIndicator } from "./DataQualityIndicator"
+import { CannabinoidInsights } from "./CannabinoidInsights"
 
 interface ResultCardProps {
   result: AnalysisResult
@@ -22,6 +27,7 @@ function StatField({ label, value }: { label: string; value: number | undefined 
 
 export function ResultCard({ result }: ResultCardProps) {
   const categoryColor = categoryColors[result.category]
+  const sdp = sdpCategories[result.category]
 
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden">
@@ -40,6 +46,9 @@ export function ResultCard({ result }: ResultCardProps) {
         <p className="text-gray-700 leading-relaxed">{result.summary}</p>
       </div>
 
+      {/* Category Details - SDP explanation */}
+      <CategoryDetails category={result.category} terpenes={result.terpenes} />
+
       {/* Terpenes */}
       <div className="px-6 py-4 border-b">
         <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">
@@ -53,6 +62,16 @@ export function ResultCard({ result }: ResultCardProps) {
             ))}
         </div>
       </div>
+
+      {/* Radar Chart */}
+      {sdp && (
+        <div className="py-4 border-b">
+          <TerpeneRadarChart
+            terpenes={result.terpenes}
+            categoryColor={sdp.color}
+          />
+        </div>
+      )}
 
       {/* Totals */}
       <div className="px-6 py-4 border-b bg-gray-50">
@@ -78,14 +97,41 @@ export function ResultCard({ result }: ResultCardProps) {
         )}
       </div>
 
-      {/* Source */}
-      <div className="px-6 py-4">
-        <SourceBadge source={result.source} evidence={result.evidence} />
+      {/* Cannabinoid Insights */}
+      {result.cannabinoid_insights && result.cannabinoid_insights.length > 0 && (
+        <CannabinoidInsights insights={result.cannabinoid_insights} />
+      )}
+
+      {/* Source + Data Quality */}
+      <div className="px-6 py-4 border-b space-y-3">
+        <SourceBadge
+          sources={result.sources}
+          source={result.source}
+          evidence={result.evidence}
+        />
+        {result.data_available && (
+          <DataQualityIndicator data={result.data_available} />
+        )}
       </div>
 
       {/* Learn More */}
       <div className="px-6 py-4 border-t bg-gray-50">
         <TerpenePanel />
+      </div>
+
+      {/* SDP Attribution Footer */}
+      <div className="px-6 py-3 border-t bg-gray-50 text-center">
+        <p className="text-xs text-gray-400">
+          Classification by{" "}
+          <a
+            href="https://straindataproject.org/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-gray-600"
+          >
+            Strain Data Project
+          </a>
+        </p>
       </div>
     </div>
   )

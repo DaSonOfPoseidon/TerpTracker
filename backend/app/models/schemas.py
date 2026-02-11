@@ -48,6 +48,7 @@ class Evidence(BaseModel):
     coa_date: Optional[str] = None
     api_source: Optional[str] = None
     match_score: Optional[float] = None  # For fuzzy name matching
+    cached_at: Optional[str] = None
     raw_data: Optional[Dict] = None
 
 # Data availability tracking
