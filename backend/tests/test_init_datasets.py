@@ -9,7 +9,6 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from app.data.init_datasets import (
-    safe_float,
     is_dataset_initialized,
     mark_dataset_initialized,
     parse_phytochem_csv,
@@ -19,6 +18,7 @@ from app.data.init_datasets import (
     LEGACY_MARKER,
     DATASETS_DIR,
 )
+from app.utils.conversions import safe_float
 from app.services.classifier import classify_terpene_profile, normalize_terpene_profile
 
 
@@ -200,18 +200,19 @@ class TestParseCannlyticsStateCsv:
 
     def test_parse_returns_correct_strain_count(self):
         result = parse_cannlytics_state_csv(FIXTURES_DIR / "cannlytics_sample.csv", "Test State")
-        # GSC (2 samples), Wedding Cake (1), Jack Herer (1)
-        # Row 4 has no strain_name, Row 5 (Gelato) has no terpene data
+        # GSC (2 samples), Wedding Cake (1), Product D (1, via product_name fallback), Jack Herer (1)
+        # Row 5 (Gelato) has no terpene data
         names = [s['name'] for s in result]
         assert "Girl Scout Cookies" in names
         assert "Wedding Cake" in names
+        assert "Product D" in names
         assert "Jack Herer" in names
-        assert len(result) == 3
+        assert len(result) == 4
 
-    def test_parse_skips_empty_strain_name(self):
+    def test_parse_skips_no_name(self):
         result = parse_cannlytics_state_csv(FIXTURES_DIR / "cannlytics_sample.csv", "Test State")
         names = [s['name'] for s in result]
-        # Row 4 has empty strain name
+        # All rows have either strain_name or product_name
         assert "" not in names
 
     def test_parse_skips_no_terpene_data(self):
@@ -431,3 +432,100 @@ class TestImportStrainsToDb:
         added_profile = mock_db.add.call_args[0][0]
         assert added_profile.provenance['sample_count'] == 15
         assert added_profile.provenance['original_dataset'] == 'test_ds'
+
+
+# ---------------------------------------------------------------------------
+# Cannlytics product_name fallback tests
+# ---------------------------------------------------------------------------
+
+class TestParseCannlyticsProductNameFallback:
+
+    def test_product_name_used_when_strain_name_empty(self):
+        result = parse_cannlytics_state_csv(FIXTURES_DIR / "cannlytics_product_name.csv", "Test State")
+        names = [s['name'] for s in result]
+        assert "Blue Dream" in names
+
+    def test_multiple_samples_aggregate(self):
+        result = parse_cannlytics_state_csv(FIXTURES_DIR / "cannlytics_product_name.csv", "Test State")
+        sour = next(s for s in result if s['name'] == 'Sour Diesel')
+        # beta_myrcene: 0.40, 0.50 -> mean = 0.45
+        assert abs(sour['terpenes']['myrcene'] - 0.45) < 0.001
+        assert sour['sample_count'] == 2
+
+    def test_strain_name_takes_priority(self):
+        result = parse_cannlytics_state_csv(FIXTURES_DIR / "cannlytics_product_name.csv", "Test State")
+        names = [s['name'] for s in result]
+        # Row with both strain_name and product_name="OG Kush" should use strain_name
+        assert "OG Kush" in names
+
+    def test_skips_rows_with_neither_name(self):
+        result = parse_cannlytics_state_csv(FIXTURES_DIR / "cannlytics_product_name.csv", "Test State")
+        names = [s['name'] for s in result]
+        assert "" not in names
+
+    def test_skips_product_name_without_terpenes(self):
+        result = parse_cannlytics_state_csv(FIXTURES_DIR / "cannlytics_product_name.csv", "Test State")
+        names = [s['name'] for s in result]
+        # Gelato has product_name but no terpene data
+        assert "Gelato" not in names
+
+    def test_total_strain_count(self):
+        result = parse_cannlytics_state_csv(FIXTURES_DIR / "cannlytics_product_name.csv", "Test State")
+        # Blue Dream (1 sample via product_name), OG Kush (1 via strain_name),
+        # Sour Diesel (2 via product_name) = 3 unique strains
+        # Row 3 skipped (no names), Row 4 Gelato skipped (no terpenes)
+        assert len(result) == 3
+
+
+# ---------------------------------------------------------------------------
+# Cannlytics JSON results parsing tests
+# ---------------------------------------------------------------------------
+
+class TestParseCannlyticsJsonResults:
+
+    def test_parses_terpenes_from_json(self):
+        result = parse_cannlytics_state_csv(FIXTURES_DIR / "cannlytics_json_results.csv", "Test State")
+        pp = next(s for s in result if s['name'] == 'Purple Punch')
+        assert 'myrcene' in pp['terpenes']
+        assert 'limonene' in pp['terpenes']
+        assert 'caryophyllene' in pp['terpenes']
+
+    def test_parses_cannabinoids_from_json(self):
+        result = parse_cannlytics_state_csv(FIXTURES_DIR / "cannlytics_json_results.csv", "Test State")
+        pp = next(s for s in result if s['name'] == 'Purple Punch')
+        # total_thc=22.5 -> fraction 0.225
+        assert pp['totals'].thc is not None
+        assert pp['totals'].thc == pytest.approx(0.225, abs=0.01)
+
+    def test_combined_product_name_and_json(self):
+        result = parse_cannlytics_state_csv(FIXTURES_DIR / "cannlytics_json_results.csv", "Test State")
+        names = [s['name'] for s in result]
+        # Zkittlez uses product_name fallback + JSON results
+        assert "Zkittlez" in names
+        zk = next(s for s in result if s['name'] == 'Zkittlez')
+        assert 'limonene' in zk['terpenes']
+        assert 'myrcene' in zk['terpenes']
+
+    def test_json_samples_aggregate_by_mean(self):
+        result = parse_cannlytics_state_csv(FIXTURES_DIR / "cannlytics_json_results.csv", "Test State")
+        pp = next(s for s in result if s['name'] == 'Purple Punch')
+        # Purple Punch has 2 samples: myrcene 0.414, 0.500 -> mean 0.457
+        assert abs(pp['terpenes']['myrcene'] - 0.457) < 0.001
+        assert pp['sample_count'] == 2
+
+    def test_skips_rows_with_only_cannabinoids_in_json(self):
+        result = parse_cannlytics_state_csv(FIXTURES_DIR / "cannlytics_json_results.csv", "Test State")
+        names = [s['name'] for s in result]
+        # Runtz has only cannabinoids in JSON, no terpenes -> skipped
+        assert "Runtz" not in names
+
+    def test_handles_malformed_json_gracefully(self):
+        result = parse_cannlytics_state_csv(FIXTURES_DIR / "cannlytics_json_results.csv", "Test State")
+        names = [s['name'] for s in result]
+        # "Broken JSON" has malformed JSON -> skipped (no terpenes parsed)
+        assert "Broken JSON" not in names
+
+    def test_skips_rows_with_no_name_despite_json(self):
+        result = parse_cannlytics_state_csv(FIXTURES_DIR / "cannlytics_json_results.csv", "Test State")
+        # Row s005 has JSON data but no strain_name or product_name -> skipped
+        assert len([s for s in result if s['name'] == '']) == 0

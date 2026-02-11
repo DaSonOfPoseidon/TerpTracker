@@ -13,16 +13,21 @@ import {
 export function TerpenePanel() {
   const [terpenes, setTerpenes] = useState<TerpeneInfo[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     listTerpenes()
       .then(setTerpenes)
-      .catch(console.error)
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load terpene info"))
       .finally(() => setLoading(false))
   }, [])
 
   if (loading) {
     return <div className="text-sm text-gray-500">Loading terpene information...</div>
+  }
+
+  if (error) {
+    return <div className="text-sm text-red-500">Failed to load terpene information: {error}</div>
   }
 
   return (

@@ -32,7 +32,14 @@
       "Bash(git -C /srv/CodeServer/TerpTracker diff docker-compose.yml)",
       "Bash(git -C /srv/CodeServer/TerpTracker diff backend/app/services/classifier.py)",
       "Bash(git -C /srv/CodeServer/TerpTracker diff CLAUDE.md)",
-      "Bash(git -C /srv/CodeServer/TerpTracker status backend/.env)"
+      "Bash(git -C /srv/CodeServer/TerpTracker status backend/.env)",
+      "Bash(.venv/bin/pytest:*)",
+      "Bash(sudo bash:*)",
+      "Bash(sudo apt install:*)",
+      "Bash(node --version:*)",
+      "Bash(npm:*)",
+      "Bash(tsc:*)",
+      "Bash(.venv/bin/python:*)"
     ],
     "deny": [],
     "ask": []

@@ -162,7 +162,7 @@ PostgreSQL tables:
 - **PostgreSQL**: Long-term storage of strain profiles and extraction history
   - ~32,874 profiles from Terpene Profile Parser dataset
   - ~3,088 profiles from Phytochemical Diversity dataset (14 terpenes + 6 cannabinoids)
-  - Thousands of profiles from Cannlytics Cannabis Results (12 US states, lab-tested)
+  - Thousands of profiles from Cannlytics Cannabis Results (7 US states, lab-tested)
   - Additional profiles from previous user searches (page scraping, COAs, APIs)
   - Deduplication by normalized strain name
   - Profiles include terpenes, cannabinoids, SDP category, and provenance metadata
@@ -175,7 +175,7 @@ On first Docker container launch, `app/data/init_datasets.py` automatically impo
 1. **[1/4] Terpene Profile Parser** (GitHub) — ~32,874 strains, 9 terpenes + cannabinoids
 2. **[2/4] Phytochemical Diversity** (GitHub) — ~3,088 unique strains averaged from ~90k lab samples, 14 terpenes + 6 cannabinoids (CC0 license)
 3. **[3/4] OpenTHC Variety Database** — 3,000+ strain name mappings for alias-aware lookups (no terpene data, name normalization only)
-4. **[4/4] Cannlytics Cannabis Results** (HuggingFace) — state-by-state lab results from 12 US states (CC BY 4.0). States imported: NY, UT, HI, FL, RI, CT, CO, MA, OR, NV, MD, MI. WA excluded (XLSX only), CA deferred (1.6GB)
+4. **[4/4] Cannlytics Cannabis Results** (HuggingFace) — state-by-state lab results from 7 US states (CC BY 4.0). States imported: NY, UT, CT, CO, FL, NV, CA. Parser supports both individual terpene columns and JSON `results` column formats. Removed: HI, RI, MA, OR, MD, MI (no usable terpene data). WA excluded (XLSX only)
 
 Each dataset is independently try/except wrapped — one failure doesn't block others. Markers are per-dataset in `backend/app/data/downloads/`:
 - `.initialized_terpene_parser`
@@ -200,7 +200,7 @@ Each dataset is independently try/except wrapped — one failure doesn't block o
 **Active Datasets (auto-imported on first launch):**
 - ✅ Terpene Profile Parser (~32k strains) - Public GitHub dataset
 - ✅ Phytochemical Diversity (~3k strains, 14 terpenes) - GitHub, CC0 license
-- ✅ Cannlytics Cannabis Results (thousands of strains, 12 US states) - HuggingFace, CC BY 4.0
+- ✅ Cannlytics Cannabis Results (thousands of strains, 7 US states) - HuggingFace, CC BY 4.0
 - ✅ OpenTHC Variety Database (3k+ strain names) - Name normalization only
 
 **Active APIs:**

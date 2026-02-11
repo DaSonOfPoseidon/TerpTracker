@@ -2,6 +2,7 @@
 # Saves and retrieves strain data from PostgreSQL to avoid repeated API calls
 
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Optional
@@ -9,7 +10,10 @@ from sqlalchemy.orm import Session
 from app.db.models import Profile
 from app.db.base import SessionLocal
 from app.models.schemas import Totals
+from app.utils.normalization import normalize_strain_name as _normalize
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 # Path to OpenTHC alias map (built during dataset init)
 ALIAS_MAP_PATH = Path(__file__).parent.parent / "data" / "downloads" / "strain_alias_map.json"
@@ -19,34 +23,8 @@ class ProfileCacheService:
     """Service for caching strain profiles in PostgreSQL."""
 
     def normalize_strain_name(self, name: str) -> str:
-        """
-        Normalize strain name for consistent lookups.
-
-        Examples:
-        - "Blue Dream" -> "blue dream"
-        - "Girl Scout Cookies" -> "girl scout cookies"
-        - "OG Kush #18" -> "og kush 18"
-        """
-        # Convert to lowercase
-        name = name.lower()
-
-        # Remove common suffixes
-        suffixes = [
-            'flower', 'bud', 'strain', 'cannabis',
-            'indica', 'sativa', 'hybrid',
-            'concentrate', 'extract', 'rosin'
-        ]
-
-        for suffix in suffixes:
-            name = name.replace(f' {suffix}', '').replace(f'{suffix} ', '')
-
-        # Clean special characters but keep spaces
-        name = ''.join(c if c.isalnum() or c.isspace() else ' ' for c in name)
-
-        # Normalize whitespace
-        name = ' '.join(name.split())
-
-        return name.strip()
+        """Normalize strain name for consistent lookups (lowercase)."""
+        return _normalize(name, title_case=False)
 
     def get_cached_profile(self, strain_name: str) -> Optional[dict]:
         """
@@ -68,7 +46,7 @@ class ProfileCacheService:
             ).first()
 
             if profile:
-                print(f"DEBUG: Found cached profile for '{strain_name}' (normalized: '{normalized_name}')")
+                logger.debug("Found cached profile for '%s' (normalized: '%s')", strain_name, normalized_name)
 
                 # Reconstruct Totals object from JSON
                 totals_dict = profile.totals or {}
@@ -83,7 +61,7 @@ class ProfileCacheService:
                     'cached_at': profile.created_at.isoformat() if profile.created_at else None
                 }
             else:
-                print(f"DEBUG: No cached profile found for '{strain_name}' (normalized: '{normalized_name}')")
+                logger.debug("No cached profile found for '%s' (normalized: '%s')", strain_name, normalized_name)
                 return None
 
         finally:
@@ -122,7 +100,7 @@ class ProfileCacheService:
             ).first()
 
             if existing:
-                print(f"DEBUG: Profile for '{strain_name}' already exists, updating...")
+                logger.debug("Profile for '%s' already exists, updating...", strain_name)
 
                 # Update existing profile
                 existing.terp_vector = terpenes
@@ -137,7 +115,7 @@ class ProfileCacheService:
                     existing.extraction_id = extraction_id
 
             else:
-                print(f"DEBUG: Creating new profile for '{strain_name}' (normalized: '{normalized_name}')")
+                logger.debug("Creating new profile for '%s' (normalized: '%s')", strain_name, normalized_name)
 
                 # Create new profile
                 new_profile = Profile(
@@ -155,11 +133,11 @@ class ProfileCacheService:
                 db.add(new_profile)
 
             db.commit()
-            print(f"DEBUG: Successfully saved profile for '{strain_name}'")
+            logger.debug("Successfully saved profile for '%s'", strain_name)
             return True
 
         except Exception as e:
-            print(f"ERROR: Failed to save profile for '{strain_name}': {e}")
+            logger.error("Failed to save profile for '%s': %s", strain_name, e)
             db.rollback()
             return False
         finally:
@@ -222,7 +200,7 @@ class ProfileCacheService:
                 ).first()
 
                 if profile:
-                    print(f"DEBUG: Found profile via alias for '{strain_name}' -> '{alt_name}'")
+                    logger.debug("Found profile via alias for '%s' -> '%s'", strain_name, alt_name)
                     totals_dict = profile.totals or {}
                     totals = Totals(**totals_dict)
 

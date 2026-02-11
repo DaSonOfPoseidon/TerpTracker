@@ -3,10 +3,13 @@ Redis-based caching and rate limiting service.
 """
 
 import json
+import logging
 import redis.asyncio as redis
 from typing import Optional, Any
 from datetime import timedelta
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 class CacheService:
     """Redis cache service for storing analysis results and rate limiting."""
@@ -25,7 +28,7 @@ class CacheService:
             # Test connection
             await self.redis.ping()
         except Exception as e:
-            print(f"Redis connection failed: {e}")
+            logger.error("Redis connection failed", exc_info=True)
             self.redis = None
 
     async def disconnect(self):
@@ -43,7 +46,7 @@ class CacheService:
             if value:
                 return json.loads(value)
         except Exception as e:
-            print(f"Cache get error: {e}")
+            logger.error("Cache get error", exc_info=True)
 
         return None
 
@@ -63,7 +66,7 @@ class CacheService:
             serialized = json.dumps(value)
             await self.redis.setex(key, ttl, serialized)
         except Exception as e:
-            print(f"Cache set error: {e}")
+            logger.error("Cache set error", exc_info=True)
 
     async def delete(self, key: str):
         """Delete a key from cache."""
@@ -73,7 +76,7 @@ class CacheService:
         try:
             await self.redis.delete(key)
         except Exception as e:
-            print(f"Cache delete error: {e}")
+            logger.error("Cache delete error", exc_info=True)
 
     async def check_rate_limit(self, client_id: str, limit: int = 30, window: int = 60) -> tuple[bool, int]:
         """
@@ -107,7 +110,7 @@ class CacheService:
                     return True, limit - count - 1
 
         except Exception as e:
-            print(f"Rate limit check error: {e}")
+            logger.error("Rate limit check error", exc_info=True)
             return True, limit  # Allow on error
 
 # Global cache instance

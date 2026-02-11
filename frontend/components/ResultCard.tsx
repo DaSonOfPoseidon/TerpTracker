@@ -1,13 +1,23 @@
 "use client"
 
 import { AnalysisResult } from "@/lib/types"
-import { categoryColors, sourceLabels, formatPercent } from "@/lib/utils"
+import { categoryColors, formatPercent } from "@/lib/utils"
 import { TerpeneChip } from "./TerpeneChip"
 import { SourceBadge } from "./SourceBadge"
 import { TerpenePanel } from "./TerpenePanel"
 
 interface ResultCardProps {
   result: AnalysisResult
+}
+
+function StatField({ label, value }: { label: string; value: number | undefined }) {
+  if (value === undefined) return null
+  return (
+    <div>
+      <span className="text-gray-600">{label}:</span>{" "}
+      <span className="font-semibold">{formatPercent(value)}</span>
+    </div>
+  )
 }
 
 export function ResultCard({ result }: ResultCardProps) {
@@ -50,30 +60,10 @@ export function ResultCard({ result }: ResultCardProps) {
           Totals
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-          {result.totals.total_terpenes !== undefined && (
-            <div>
-              <span className="text-gray-600">Total Terpenes:</span>{" "}
-              <span className="font-semibold">{formatPercent(result.totals.total_terpenes)}</span>
-            </div>
-          )}
-          {result.totals.thc !== undefined && (
-            <div>
-              <span className="text-gray-600">THC:</span>{" "}
-              <span className="font-semibold">{formatPercent(result.totals.thc)}</span>
-            </div>
-          )}
-          {result.totals.thca !== undefined && (
-            <div>
-              <span className="text-gray-600">THCa:</span>{" "}
-              <span className="font-semibold">{formatPercent(result.totals.thca)}</span>
-            </div>
-          )}
-          {result.totals.cbd !== undefined && (
-            <div>
-              <span className="text-gray-600">CBD:</span>{" "}
-              <span className="font-semibold">{formatPercent(result.totals.cbd)}</span>
-            </div>
-          )}
+          <StatField label="Total Terpenes" value={result.totals.total_terpenes} />
+          <StatField label="THC" value={result.totals.thc} />
+          <StatField label="THCa" value={result.totals.thca} />
+          <StatField label="CBD" value={result.totals.cbd} />
         </div>
 
         {result.totals.total_terpenes !== undefined && result.totals.thca !== undefined && (

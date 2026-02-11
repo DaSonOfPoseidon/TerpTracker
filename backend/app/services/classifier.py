@@ -11,6 +11,12 @@ Categories:
 """
 
 from typing import Dict, Tuple, List
+from app.core.constants import (
+    ORANGE_THRESHOLD, GREEN_THRESHOLD, BLUE_THRESHOLD,
+    PURPLE_CARYOPHYLLENE_MIN, PURPLE_PINENE_MAX,
+    YELLOW_THRESHOLD, RED_BALANCED_MIN, RED_PINENE_MAX, RED_HUMULENE_MAX,
+    DOMINANCE_MARGIN,
+)
 
 # Category descriptions for summaries
 CATEGORY_DESCRIPTIONS = {
@@ -102,29 +108,29 @@ def classify_terpene_profile(terpenes: Dict[str, float]) -> str:
     # Apply SDP classification heuristic
 
     # ORANGE: Terpinolene-dominant
-    if terpinolene >= 0.35 or (top_terp == "terpinolene" and top_value - terpinolene >= 0.10):
+    if terpinolene >= ORANGE_THRESHOLD or (top_terp == "terpinolene" and top_value - terpinolene >= DOMINANCE_MARGIN):
         return "ORANGE"
 
     # GREEN: Pinene-dominant
-    if pinene_total >= 0.35 or (top_terp in ["alpha_pinene", "beta_pinene"] and top_value >= 0.10):
+    if pinene_total >= GREEN_THRESHOLD or (top_terp in ["alpha_pinene", "beta_pinene"] and top_value >= DOMINANCE_MARGIN):
         return "GREEN"
 
     # BLUE: Myrcene-dominant
-    if myrcene >= 0.35 or (top_terp == "myrcene" and top_value - myrcene >= 0.10):
+    if myrcene >= BLUE_THRESHOLD or (top_terp == "myrcene" and top_value - myrcene >= DOMINANCE_MARGIN):
         return "BLUE"
 
     # RED: Balanced myrcene-limonene-caryophyllene (check before PURPLE — more specific)
-    if (myrcene >= 0.20 and limonene >= 0.20 and caryophyllene >= 0.20 and
+    if (myrcene >= RED_BALANCED_MIN and limonene >= RED_BALANCED_MIN and caryophyllene >= RED_BALANCED_MIN and
         is_within_range([myrcene, limonene, caryophyllene]) and
-        pinene_total <= 0.15 and humulene <= 0.15):
+        pinene_total <= RED_PINENE_MAX and humulene <= RED_HUMULENE_MAX):
         return "RED"
 
     # PURPLE: Caryophyllene-dominant with low pinene
-    if caryophyllene >= 0.30 and pinene_total <= 0.15:
+    if caryophyllene >= PURPLE_CARYOPHYLLENE_MIN and pinene_total <= PURPLE_PINENE_MAX:
         return "PURPLE"
 
     # YELLOW: Limonene-dominant
-    if limonene >= 0.30:
+    if limonene >= YELLOW_THRESHOLD:
         return "YELLOW"
 
     # Fallback: pick nearest by top terpene

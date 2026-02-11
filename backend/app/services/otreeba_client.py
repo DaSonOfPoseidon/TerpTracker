@@ -3,10 +3,15 @@ Client for Otreeba (Open Cannabis API)
 https://api.otreeba.com/swagger/
 """
 
+import logging
+import urllib.parse
 import httpx
 from typing import Optional
 from app.core.config import settings
 from app.models.schemas import StrainAPIData, Totals
+from app.utils.conversions import safe_terpene_value
+
+logger = logging.getLogger(__name__)
 
 
 class OtreebaClient:
@@ -27,12 +32,10 @@ class OtreebaClient:
             StrainAPIData with terpene profile, or None if not found
         """
         if not self.api_key:
-            print("Otreeba API key not configured")
+            logger.debug("Otreeba API key not configured")
             return None
 
         try:
-            import urllib.parse
-
             encoded_name = urllib.parse.quote_plus(strain_name)
 
             async with httpx.AsyncClient(timeout=15.0) as client:
@@ -44,7 +47,7 @@ class OtreebaClient:
 
                 # Try strains endpoint
                 url = f"{self.base_url}/strains"
-                print(f"Fetching strain data from Otreeba API: {strain_name}")
+                logger.debug("Fetching strain data from Otreeba API: %s", strain_name)
 
                 # Search for strain by name
                 response = await client.get(
@@ -54,21 +57,21 @@ class OtreebaClient:
                 )
 
                 if response.status_code != 200:
-                    print(f"Otreeba API returned status {response.status_code}")
+                    logger.debug("Otreeba API returned status %s", response.status_code)
                     return None
 
                 result = response.json()
-                print(f"Otreeba API response type: {type(result)}")
+                logger.debug("Otreeba API response type: %s", type(result))
 
                 # Otreeba typically returns {"data": [...]}
                 data = result.get('data', [])
                 if not data or not isinstance(data, list):
-                    print("No strains found in Otreeba response")
+                    logger.debug("No strains found in Otreeba response")
                     return None
 
                 # Find best match (first result should be closest)
                 strain = data[0]
-                print(f"Found strain in Otreeba: {strain.get('name')}")
+                logger.debug("Found strain in Otreeba: %s", strain.get('name'))
 
                 # Extract terpene and cannabinoid data
                 terpenes = {}
@@ -76,19 +79,11 @@ class OtreebaClient:
 
                 # Otreeba structure varies - check for lab results
                 # Common fields: thc, cbd, labResults, etc.
-                if 'thc' in strain:
-                    try:
-                        val = float(strain['thc'])
-                        totals.thc = val / 100 if val > 1 else val
-                    except (ValueError, TypeError):
-                        pass
-
-                if 'cbd' in strain:
-                    try:
-                        val = float(strain['cbd'])
-                        totals.cbd = val / 100 if val > 1 else val
-                    except (ValueError, TypeError):
-                        pass
+                for field in ['thc', 'cbd']:
+                    if field in strain:
+                        val = safe_terpene_value(strain[field])
+                        if val is not None:
+                            setattr(totals, field, val)
 
                 # Check for lab results which might have more detailed data
                 lab_results = strain.get('labResults', [])
@@ -105,50 +100,46 @@ class OtreebaClient:
                                     continue
 
                                 name = analyte.get('name', '').lower()
-                                value = analyte.get('value')
-
-                                if value is None:
+                                raw_value = analyte.get('value')
+                                if raw_value is None:
                                     continue
 
-                                try:
-                                    val = float(value)
+                                val = safe_terpene_value(raw_value)
+                                if val is None:
+                                    continue
 
-                                    # Map terpenes
-                                    if 'myrcene' in name:
-                                        terpenes['myrcene'] = val / 100 if val > 1 else val
-                                    elif 'limonene' in name:
-                                        terpenes['limonene'] = val / 100 if val > 1 else val
-                                    elif 'caryophyllene' in name:
-                                        terpenes['caryophyllene'] = val / 100 if val > 1 else val
-                                    elif 'pinene' in name:
-                                        if 'alpha' in name:
-                                            terpenes['alpha_pinene'] = val / 100 if val > 1 else val
-                                        elif 'beta' in name:
-                                            terpenes['beta_pinene'] = val / 100 if val > 1 else val
-                                    elif 'terpinolene' in name:
-                                        terpenes['terpinolene'] = val / 100 if val > 1 else val
-                                    elif 'humulene' in name:
-                                        terpenes['humulene'] = val / 100 if val > 1 else val
-                                    elif 'linalool' in name:
-                                        terpenes['linalool'] = val / 100 if val > 1 else val
-                                    elif 'ocimene' in name:
-                                        terpenes['ocimene'] = val / 100 if val > 1 else val
-
-                                    # Map cannabinoids
-                                    elif name == 'thc' or 'delta-9' in name:
-                                        totals.thc = val / 100 if val > 1 else val
-                                    elif name == 'thca':
-                                        totals.thca = val / 100 if val > 1 else val
-                                    elif name == 'cbd':
-                                        totals.cbd = val / 100 if val > 1 else val
-                                    elif name == 'cbda':
-                                        totals.cbda = val / 100 if val > 1 else val
-                                    elif name == 'cbn':
-                                        totals.cbn = val / 100 if val > 1 else val
-                                    elif name == 'cbg':
-                                        totals.cbg = val / 100 if val > 1 else val
-                                except (ValueError, TypeError):
-                                    pass
+                                # Map terpenes
+                                terpene_map = {
+                                    'myrcene': 'myrcene', 'limonene': 'limonene',
+                                    'caryophyllene': 'caryophyllene', 'terpinolene': 'terpinolene',
+                                    'humulene': 'humulene', 'linalool': 'linalool', 'ocimene': 'ocimene',
+                                }
+                                cannabinoid_map = {
+                                    'thca': 'thca', 'cbd': 'cbd', 'cbda': 'cbda',
+                                    'cbn': 'cbn', 'cbg': 'cbg',
+                                }
+                                matched = False
+                                for keyword, std in terpene_map.items():
+                                    if keyword in name:
+                                        if keyword == 'pinene':
+                                            continue  # handled below
+                                        terpenes[std] = val
+                                        matched = True
+                                        break
+                                if not matched and 'pinene' in name:
+                                    if 'alpha' in name:
+                                        terpenes['alpha_pinene'] = val
+                                    elif 'beta' in name:
+                                        terpenes['beta_pinene'] = val
+                                    matched = True
+                                if not matched:
+                                    if name == 'thc' or 'delta-9' in name:
+                                        totals.thc = val
+                                    else:
+                                        for keyword, std in cannabinoid_map.items():
+                                            if name == keyword:
+                                                setattr(totals, std, val)
+                                                break
 
                 # Check if we got any useful data
                 has_data = bool(terpenes) or any([
@@ -157,10 +148,10 @@ class OtreebaClient:
                 ])
 
                 if not has_data:
-                    print("Otreeba strain found but no terpene/cannabinoid data")
+                    logger.debug("Otreeba strain found but no terpene/cannabinoid data")
                     return None
 
-                print(f"Otreeba data - Terpenes: {len(terpenes)}, Cannabinoids: {bool(totals.thc or totals.cbd)}")
+                logger.info("Otreeba data - Terpenes: %s, Cannabinoids: %s", len(terpenes), bool(totals.thc or totals.cbd))
 
                 return StrainAPIData(
                     strain_name=strain.get('name', strain_name),
@@ -171,7 +162,7 @@ class OtreebaClient:
                 )
 
         except Exception as e:
-            print(f"Otreeba API error: {e}")
+            logger.error("Otreeba API error", exc_info=True)
             return None
 
 

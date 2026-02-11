@@ -17,6 +17,10 @@ else
     echo "Xvfb is already running"
 fi
 
+# Run database migrations
+echo "Running database migrations..."
+alembic upgrade head
+
 # Initialize strain database with public datasets (runs only on first launch)
 echo "Checking dataset initialization..."
 python -m app.data.init_datasets

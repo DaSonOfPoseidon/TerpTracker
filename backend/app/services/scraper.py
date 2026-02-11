@@ -7,9 +7,14 @@ import re
 import hashlib
 import json
 from typing import Optional, List, Dict
+from urllib.parse import urljoin
 from playwright.async_api import async_playwright, Page
 from bs4 import BeautifulSoup
 from app.models.schemas import ScrapedData, Totals
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Common terpene names and variations
 TERPENE_PATTERNS = {
@@ -44,10 +49,10 @@ async def get_dutchie_iframe(page: Page) -> Optional[Page]:
         for frame in iframes:
             url = frame.url
             if 'dutchie.com' in url:
-                print(f"Found Dutchie iframe: {url}")
+                logger.debug("Found Dutchie iframe: %s", url)
                 return frame
     except Exception as e:
-        print(f"Iframe detection note: {e}")
+        logger.debug("Iframe detection note: %s", e)
 
     return None
 
@@ -76,10 +81,10 @@ async def handle_age_verification(page: Page) -> None:
                 element = await page.query_selector(pattern)
                 if element:
                     await element.click()
-                    print(f"Clicked age gate with pattern: {pattern}")
+                    logger.debug("Clicked age gate with pattern: %s", pattern)
                     await page.wait_for_timeout(2000)
                     return
-            except:
+            except Exception:
                 continue
 
         # Strategy 2: Look for buttons/links with specific text
@@ -89,15 +94,14 @@ async def handle_age_verification(page: Page) -> None:
                 text = (await button.inner_text()).lower()
                 if any(word in text for word in ['yes', 'enter', 'i am 21', 'i am 18', 'continue', 'confirm']):
                     await button.click()
-                    print(f"Clicked age button: {text}")
+                    logger.debug("Clicked age button: %s", text)
                     await page.wait_for_timeout(2000)
                     return
-            except:
+            except Exception:
                 continue
 
     except Exception as e:
-        print(f"Age verification note: {e}")
-        pass
+        logger.debug("Age verification note: %s", e)
 
 async def scrape_url(url: str) -> ScrapedData:
     """
@@ -119,7 +123,7 @@ async def scrape_url(url: str) -> ScrapedData:
 
             # Log ALL Dutchie responses for debugging
             if 'dutchie.com' in url:
-                print(f"Dutchie response detected: {url} (status: {response.status})")
+                logger.debug("Dutchie response detected: %s (status: %s)", url, response.status)
 
             # Capture Dutchie API calls (GraphQL and REST)
             if 'dutchie.com' in url and response.status == 200:
@@ -127,8 +131,8 @@ async def scrape_url(url: str) -> ScrapedData:
                 if any(keyword in url.lower() for keyword in ['graphql', 'api', 'product', 'menu']):
                     try:
                         data = await response.json()
-                        print(f"✓ Intercepted Dutchie API call: {url}")
-                        print(f"  Response keys: {list(data.keys()) if isinstance(data, dict) else 'not a dict'}")
+                        logger.debug("Intercepted Dutchie API call: %s", url)
+                        logger.debug("  Response keys: %s", list(data.keys()) if isinstance(data, dict) else "not a dict")
                         intercepted_data['responses'].append({
                             'url': url,
                             'data': data
@@ -138,22 +142,22 @@ async def scrape_url(url: str) -> ScrapedData:
                             # Prioritize IndividualFilteredProduct - this is the main product details API
                             if 'IndividualFilteredProduct' in url:
                                 intercepted_data['product'] = data.get('data', data)
-                                print(f"  *** PRIORITY: Found IndividualFilteredProduct response ***")
+                                logger.debug("  PRIORITY: Found IndividualFilteredProduct response")
                             # GraphQL responses often have 'data' key - but don't overwrite if we already have priority data
                             elif 'product' not in intercepted_data and 'data' in data:
                                 intercepted_data['product'] = data['data']
-                                print(f"  Found 'data' key in response")
+                                logger.debug("  Found 'data' key in response")
                             # Some APIs return product directly
                             elif 'product' not in intercepted_data and 'product' in data:
                                 intercepted_data['product'] = data['product']
-                                print(f"  Found 'product' key in response")
+                                logger.debug("  Found 'product' key in response")
                             elif 'product' not in intercepted_data and 'products' in data:
                                 intercepted_data['product'] = data
-                                print(f"  Found 'products' key in response")
+                                logger.debug("  Found 'products' key in response")
                     except Exception as json_err:
-                        print(f"  Could not parse as JSON: {json_err}")
+                        logger.debug("  Could not parse as JSON: %s", json_err)
         except Exception as e:
-            print(f"Response handler error: {e}")
+            logger.debug("Response handler error: %s", e)
 
     async with async_playwright() as p:
         # Launch in headed mode with stealth settings to bypass anti-bot detection
@@ -215,22 +219,22 @@ async def scrape_url(url: str) -> ScrapedData:
             # Check for Dutchie iframe and switch to it if present
             iframe_page = await get_dutchie_iframe(page)
             if iframe_page:
-                print("Found Dutchie iframe, scraping from embedded menu...")
+                logger.info("Found Dutchie iframe, scraping from embedded menu...")
                 page = iframe_page
                 await page.wait_for_timeout(3000)
             else:
                 # Try to find Dutchie embed URL in page source and navigate directly
-                print("No Dutchie iframe found, checking for embed URL in source...")
+                logger.debug("No Dutchie iframe found, checking for embed URL in source...")
                 html_content_temp = await page.content()
 
                 # Debug: Check if 'dutchie' appears anywhere in the page
                 dutchie_count = html_content_temp.lower().count('dutchie')
-                print(f"Found 'dutchie' {dutchie_count} times in page HTML")
+                logger.debug("Found 'dutchie' %s times in page HTML", dutchie_count)
 
                 # Try to find any Dutchie-related content
                 dutchie_matches = re.findall(r'[^\s]*dutchie[^\s]*', html_content_temp, re.I)
                 if dutchie_matches:
-                    print(f"Dutchie-related strings found: {dutchie_matches[:5]}")  # Show first 5
+                    logger.debug("Dutchie-related strings found: %s", dutchie_matches[:5])
 
                 dutchie_embed_match = re.search(
                     r'https://dutchie\.com/embedded-menu/[^\s\'"]+',
@@ -238,12 +242,12 @@ async def scrape_url(url: str) -> ScrapedData:
                 )
                 if dutchie_embed_match:
                     dutchie_url = dutchie_embed_match.group(0)
-                    print(f"Found Dutchie embed URL: {dutchie_url}")
-                    print("Navigating directly to Dutchie menu...")
+                    logger.debug("Found Dutchie embed URL: %s", dutchie_url)
+                    logger.debug("Navigating directly to Dutchie menu...")
                     await page.goto(dutchie_url, wait_until="domcontentloaded", timeout=60000)
                     await page.wait_for_timeout(5000)  # Wait for Dutchie menu to load
                 else:
-                    print("No Dutchie embed URL found in page source")
+                    logger.debug("No Dutchie embed URL found in page source")
 
             # Get page content
             html_content = await page.content()
@@ -274,8 +278,7 @@ def extract_terpenes_from_api(data: dict) -> Dict[str, float]:
     Extract terpene data from API response (Dutchie GraphQL/REST).
     Recursively searches through nested data structures.
     """
-    import json
-    print(f"DEBUG: API data to extract terpenes from: {json.dumps(data, default=str)[:1000]}")
+    logger.debug("API data to extract terpenes from: %s", json.dumps(data, default=str)[:1000])
     terpenes = {}
 
     def search_for_terpenes(obj, depth=0):
@@ -321,11 +324,11 @@ def extract_terpenes_from_api(data: dict) -> Dict[str, float]:
             if value_key in item:
                 try:
                     raw_value = float(item[value_key])
-                    print(f"DEBUG: Found terpene '{name}' with raw value {raw_value} from key '{value_key}'")
+                    logger.debug("Found terpene '%s' with raw value %s from key '%s'", name, raw_value, value_key)
                     # API values are percentages, convert to fractions
                     # Dutchie returns values like 1.13 meaning 1.13%
                     value = raw_value / 100
-                    print(f"DEBUG: Converted to fraction: {value}")
+                    logger.debug("Converted to fraction: %s", value)
                     break
                 except (ValueError, TypeError):
                     pass
@@ -335,7 +338,7 @@ def extract_terpenes_from_api(data: dict) -> Dict[str, float]:
             for pattern, standard_name in TERPENE_PATTERNS.items():
                 if re.search(pattern, name, re.I):
                     terpenes[standard_name] = value
-                    print(f"DEBUG: Stored {standard_name} = {value}")
+                    logger.debug("Stored %s = %s", standard_name, value)
                     break
 
     # Start recursive search
@@ -362,12 +365,12 @@ async def extract_strain_name(page: Page, html: str) -> Optional[str]:
             elem = await page.query_selector(selector)
             if elem:
                 name = await elem.inner_text()
-                print(f"DEBUG: Selector '{selector}' found: '{name}'")
+                logger.debug("Selector '%s' found: '%s'", selector, name)
                 if name and len(name.strip()) > 2:
                     # For Dutchie pages with "|" in the name, extract the strain
                     if '|' in name and len(name.split('|')) >= 2:
                         parts = [p.strip() for p in name.split('|')]
-                        print(f"DEBUG: Pipe-separated parts: {parts}")
+                        logger.debug("Pipe-separated parts: %s", parts)
 
                         # Determine format based on first part:
                         # Format 1: "Brand: Type | Strain Name | Size" (GDF) → use parts[1]
@@ -375,51 +378,50 @@ async def extract_strain_name(page: Page, html: str) -> Optional[str]:
                         if ':' in parts[0] or len(parts) >= 3:
                             # Multi-part with brand/type prefix - use second part
                             strain_part = parts[1]
-                            print(f"DEBUG: Detected format with brand prefix, using parts[1]")
+                            logger.debug("Detected format with brand prefix, using parts[1]")
                         else:
                             # Simple "Strain | Type" format - use first part
                             strain_part = parts[0]
-                            print(f"DEBUG: Detected simple format, using parts[0]")
+                            logger.debug("Detected simple format, using parts[0]")
 
                         # Clean up package numbers (#01, #02, etc.)
                         strain_part = re.sub(r'\s*#\d+.*$', '', strain_part)
-                        print(f"DEBUG: Extracted strain from pipe-separated format: '{strain_part}'")
+                        logger.debug("Extracted strain from pipe-separated format: '%s'", strain_part)
                         if strain_part and len(strain_part) > 2:
                             return strain_part.strip()
 
                     # Clean up product type suffixes (fallback)
                     name = re.sub(r'\s*[\|\-–].*$', '', name)
                     name = re.sub(r'\s+(flower|bud|strain|cannabis)$', '', name, flags=re.I)
-                    print(f"DEBUG: Cleaned name: '{name}'")
+                    logger.debug("Cleaned name: '%s'", name)
                     return name.strip()
         except Exception as e:
-            print(f"DEBUG: Selector '{selector}' failed: {e}")
-            pass
+            logger.debug("Selector '%s' failed: %s", selector, e)
 
     # Try page title
     title = await page.title()
     if title:
-        print(f"DEBUG: Page title: '{title}'")
-        print(f"DEBUG: Page URL: '{page.url}'")
+        logger.debug("Page title: '%s'", title)
+        logger.debug("Page URL: '%s'", page.url)
 
         # Dutchie-specific: Title format is "Brand: Type | Strain Name | Size"
         # Extract the second segment (strain name)
         if '|' in title and ('dutchie' in page.url.lower() or 'dtche[product]' in page.url):
-            print(f"DEBUG: Dutchie title format detected")
+            logger.debug("Dutchie title format detected")
             parts = [p.strip() for p in title.split('|')]
-            print(f"DEBUG: Title parts: {parts}")
+            logger.debug("Title parts: %s", parts)
             if len(parts) >= 2:
                 # Second part is the strain name
                 strain_part = parts[1]
                 # Clean up package numbers (#01, #02, etc.)
                 strain_part = re.sub(r'\s*#\d+.*$', '', strain_part)
-                print(f"DEBUG: Extracted strain name: '{strain_part}'")
+                logger.debug("Extracted strain name: '%s'", strain_part)
                 if strain_part and len(strain_part) > 2:
                     return strain_part.strip()
 
         # Fallback: Clean up common suffixes
         clean_title = re.sub(r'\s*[\|\-–]\s*.*$', '', title)
-        print(f"DEBUG: Fallback clean_title: '{clean_title}'")
+        logger.debug("Fallback clean_title: '%s'", clean_title)
         if clean_title and len(clean_title) > 2:
             return clean_title.strip()
 
@@ -438,7 +440,7 @@ async def extract_strain_name(page: Page, html: str) -> Optional[str]:
             data = json.loads(json_ld.string)
             if isinstance(data, dict) and 'name' in data:
                 return data['name']
-        except:
+        except Exception:
             pass
 
     # Try meta tags
@@ -473,23 +475,23 @@ async def extract_terpenes(page: Page, html: str, intercepted_data: dict = None)
 
     # Strategy 0: Check intercepted API data first (most reliable for Dutchie)
     if intercepted_data and intercepted_data.get('product'):
-        print("Attempting to extract terpenes from intercepted API data...")
+        logger.debug("Attempting to extract terpenes from intercepted API data...")
         api_terpenes = extract_terpenes_from_api(intercepted_data['product'])
         if api_terpenes:
-            print(f"Successfully extracted {len(api_terpenes)} terpenes from API data")
+            logger.info("Successfully extracted %s terpenes from API data", len(api_terpenes))
             return api_terpenes
         else:
-            print("No terpenes found in API data, falling back to DOM scraping...")
+            logger.debug("No terpenes found in API data, falling back to DOM scraping...")
 
     # If no API data, fall back to DOM scraping
-    print("DEBUG: Starting DOM scraping for terpenes...")
+    logger.debug("Starting DOM scraping for terpenes...")
     soup = BeautifulSoup(html, 'html.parser')
 
     # Strategy 1: Look for styled-components / Dutchie menu patterns
     # Look for elements with class names like "terpene__Name" or similar
-    print("DEBUG: Strategy 1 - Looking for terpene class elements...")
+    logger.debug("Strategy 1 - Looking for terpene class elements...")
     terpene_elements = soup.find_all(class_=re.compile(r'terpene.*name', re.I))
-    print(f"DEBUG: Found {len(terpene_elements)} terpene elements")
+    logger.debug("Found %s terpene elements", len(terpene_elements))
     if terpene_elements:
         for elem in terpene_elements:
             terp_name = elem.get_text(strip=True).lower()
@@ -524,7 +526,7 @@ async def extract_terpenes(page: Page, html: str, intercepted_data: dict = None)
                         # Value extracted with %, convert to fraction
                         value = value / 100
                         terpenes[standard_name] = value
-    except:
+    except Exception:
         pass  # Fallback to HTML parsing if Playwright query fails
 
     # Strategy 3: Original regex-based extraction
@@ -679,12 +681,12 @@ async def extract_totals(page: Page, html: str, intercepted_data: dict = None) -
     """Extract total terpenes and cannabinoid data from API or page content."""
     # Strategy 0: Check intercepted API data first
     if intercepted_data and intercepted_data.get('product'):
-        print("Attempting to extract totals from intercepted API data...")
+        logger.debug("Attempting to extract totals from intercepted API data...")
         api_totals = extract_totals_from_api(intercepted_data['product'])
         # Check if we found any data
         if (api_totals.thc or api_totals.thca or api_totals.cbd or
             api_totals.cbda or api_totals.total_terpenes):
-            print("Successfully extracted cannabinoid data from API")
+            logger.info("Successfully extracted cannabinoid data from API")
             return api_totals
 
     # If no API data, fall back to DOM scraping
@@ -762,7 +764,6 @@ async def extract_coa_links(page: Page, html: str, base_url: str) -> List[str]:
                 coa_links.append('https:' + href)
             else:
                 # Relative URL - combine with base
-                from urllib.parse import urljoin
                 coa_links.append(urljoin(base_url, href))
 
     # Look for QR codes that might link to COAs

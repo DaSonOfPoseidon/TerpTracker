@@ -3,12 +3,13 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: terptracker
       POSTGRES_PASSWORD: terptracker
       POSTGRES_DB: terptracker
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -19,8 +20,9 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -31,8 +33,9 @@ services:
 
   backend:
     build: ./backend
+    restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - ./backend:/app
     environment:
@@ -45,20 +48,28 @@ services:
         condition: service_healthy
     env_file:
       - ./backend/.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   frontend:
     build: ./frontend
+    restart: unless-stopped
     labels:
       cloudflare-tunnel.enable: "true"
       cloudflare-tunnel.subdomain: "terps"
+      cloudflare-tunnel.port: "3000"
     ports:
-      - "3000:3000"
+      - "3001:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8001
     depends_on:
       - backend
 

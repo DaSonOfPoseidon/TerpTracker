@@ -22,6 +22,9 @@ from app.db.base import SessionLocal
 from app.db.models import Profile
 from app.services.classifier import classify_terpene_profile
 from app.models.schemas import Totals
+from app.core.constants import TERPENE_FIELD_MAP, CANNABINOID_FIELD_MAP
+from app.utils.conversions import safe_float, safe_terpene_value
+from app.utils.normalization import normalize_strain_name
 
 
 DATASETS_DIR = Path(__file__).parent / "downloads"
@@ -45,46 +48,23 @@ OPENTHC_STRAINS_JSON = "https://vdb.openthc.org/download/strains.json"
 # Cannlytics HuggingFace CSV URL pattern
 CANNLYTICS_BASE = "https://huggingface.co/datasets/cannlytics/cannabis_results/resolve/main/data"
 
-# States ordered by CSV size: small -> medium -> large
-# Washington excluded (XLSX only), California deferred (1.6GB)
+# States with usable terpene data, ordered small -> large
+# Removed: HI, RI, MA, OR, MD, MI (no individual terpene breakdowns or no strain names)
+# Excluded: WA (XLSX only)
 CANNLYTICS_STATES = [
-    # Small
     ("ny", "New York"),
     ("ut", "Utah"),
-    ("hi", "Hawaii"),
-    ("fl", "Florida"),
-    ("ri", "Rhode Island"),
-    # Medium
     ("ct", "Connecticut"),
     ("co", "Colorado"),
-    ("ma", "Massachusetts"),
-    # Large
-    ("or", "Oregon"),
+    ("fl", "Florida"),
     ("nv", "Nevada"),
-    ("md", "Maryland"),
-    ("mi", "Michigan"),
+    ("ca", "California"),
 ]
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def safe_float(value) -> Optional[float]:
-    """Safely parse a value to float, return None on failure."""
-    if value is None:
-        return None
-    try:
-        s = str(value).strip()
-        if not s or s.lower() in ('', 'nan', 'none', 'null', 'nd', 'n/a', '<loq'):
-            return None
-        result = float(s)
-        if result > 0:
-            return result
-        return None
-    except (ValueError, TypeError):
-        return None
-
 
 def is_dataset_initialized(key: str) -> bool:
     """Check if a specific dataset has already been loaded."""
@@ -411,40 +391,9 @@ def parse_cannlytics_state_csv(filepath: Path, state: str) -> List[Dict]:
     """
     print(f"\n  Parsing {filepath.name} ({state})...")
 
-    terpene_columns = {
-        'beta_myrcene': 'myrcene',
-        'myrcene': 'myrcene',
-        'd_limonene': 'limonene',
-        'beta_caryophyllene': 'caryophyllene',
-        'alpha_pinene': 'alpha_pinene',
-        'beta_pinene': 'beta_pinene',
-        'terpinolene': 'terpinolene',
-        'alpha_humulene': 'humulene',
-        'linalool': 'linalool',
-        'ocimene': 'ocimene',
-        'beta_ocimene': 'ocimene',
-        'alpha_bisabolol': 'bisabolol',
-        'camphene': 'camphene',
-        'geraniol': 'geraniol',
-        'nerolidol': 'nerolidol',
-        'alpha_terpinene': 'alpha_terpinene',
-        'gamma_terpinene': 'gamma_terpinene',
-        'caryophyllene_oxide': 'caryophyllene_oxide',
-    }
-
-    cannabinoid_columns = {
-        'total_thc': 'thc',
-        'total_cbd': 'cbd',
-        'cbg': 'cbg',
-        'cbn': 'cbn',
-        'thcv': 'thcv',
-        'cbc': 'cbc',
-        'cbdv': 'cbdv',
-        'delta_9_thc': 'thc',
-        'thca': 'thca',
-        'cbda': 'cbda',
-        'cbga': 'cbg',
-    }
+    # Use shared field maps (already include all keys needed for Cannlytics CSVs)
+    terpene_columns = TERPENE_FIELD_MAP
+    cannabinoid_columns = CANNABINOID_FIELD_MAP
 
     strain_samples = defaultdict(list)
     rows_read = 0
@@ -464,6 +413,8 @@ def parse_cannlytics_state_csv(filepath: Path, state: str) -> List[Dict]:
             rows_read += 1
             strain_name = (row.get('strain_name') or '').strip()
             if not strain_name:
+                strain_name = (row.get('product_name') or '').strip()
+            if not strain_name:
                 continue
 
             # Extract terpenes
@@ -482,6 +433,31 @@ def parse_cannlytics_state_csv(filepath: Path, state: str) -> List[Dict]:
                 if val is not None:
                     if std_name not in cannabinoids or val > cannabinoids[std_name]:
                         cannabinoids[std_name] = val
+
+            # Fallback: parse 'results' JSON column when individual columns had no terpenes
+            if not terpenes:
+                results_raw = (row.get('results') or '').strip()
+                if results_raw:
+                    try:
+                        results_list = json.loads(results_raw)
+                        for entry in results_list:
+                            if not isinstance(entry, dict):
+                                continue
+                            analysis = (entry.get('analysis') or '').lower()
+                            key = entry.get('key', '')
+                            val = safe_float(entry.get('value'))
+                            if val is None:
+                                continue
+                            if analysis == 'terpenes' and key in terpene_columns:
+                                std_name = terpene_columns[key]
+                                if std_name not in terpenes or val > terpenes[std_name]:
+                                    terpenes[std_name] = val
+                            elif analysis == 'cannabinoids' and key in cannabinoid_columns:
+                                std_name = cannabinoid_columns[key]
+                                if std_name not in cannabinoids or val > cannabinoids[std_name]:
+                                    cannabinoids[std_name] = val
+                    except (json.JSONDecodeError, TypeError):
+                        pass
 
             if not terpenes:
                 continue
@@ -596,9 +572,7 @@ def import_strains_to_db(strains: List[Dict], source: str = 'dataset_import',
             totals = strain_data['totals']
 
             # Normalize strain name for lookup
-            normalized_name = strain_name.lower()
-            normalized_name = ''.join(c if c.isalnum() or c.isspace() else ' ' for c in normalized_name)
-            normalized_name = ' '.join(normalized_name.split()).strip()
+            normalized_name = normalize_strain_name(strain_name)
 
             if not normalized_name:
                 skipped_count += 1

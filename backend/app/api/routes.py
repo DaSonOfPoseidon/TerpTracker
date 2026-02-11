@@ -1,10 +1,12 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+import hashlib
+import logging
+from fastapi import APIRouter, HTTPException
 from app.models.schemas import AnalyzeUrlRequest, AnalyzeUrlResponse, TerpeneInfo
 from app.services.analyzer import StrainAnalyzer
 from app.services.cache import cache_service
-from app.services.cannlytics_client import CannlyticsClient
-from app.services.classifier import classify_terpene_profile, generate_summary, generate_cannabinoid_insights
-import hashlib
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -103,7 +105,9 @@ async def analyze_url(request: AnalyzeUrlRequest):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+        logger.error("Analysis failed for URL %s", url_str, exc_info=True)
+        detail = f"Analysis failed: {str(e)}" if settings.debug else "Analysis failed"
+        raise HTTPException(status_code=500, detail=detail)
 
 @router.get("/terpenes/{key}", response_model=TerpeneInfo)
 async def get_terpene_info(key: str):
@@ -134,6 +138,9 @@ async def test_strain_lookup(strain_name: str):
     Test endpoint: Look up a strain directly by name using Cannlytics API.
     Bypasses scraping to verify API integration and classification pipeline.
     """
+    from app.services.cannlytics_client import CannlyticsClient
+    from app.services.classifier import classify_terpene_profile, generate_summary, generate_cannabinoid_insights
+
     try:
         client = CannlyticsClient()
         strain_data = await client.get_strain_data(strain_name)
@@ -162,4 +169,6 @@ async def test_strain_lookup(strain_name: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lookup failed: {str(e)}")
+        logger.error("Test strain lookup failed for '%s'", strain_name, exc_info=True)
+        detail = f"Lookup failed: {str(e)}" if settings.debug else "Lookup failed"
+        raise HTTPException(status_code=500, detail=detail)

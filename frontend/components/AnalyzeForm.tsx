@@ -9,13 +9,12 @@ import { Loader2 } from "lucide-react"
 
 interface AnalyzeFormProps {
   onResult: (result: AnalysisResult | null) => void
-  loading: boolean
-  setLoading: (loading: boolean) => void
 }
 
-export function AnalyzeForm({ onResult, loading, setLoading }: AnalyzeFormProps) {
+export function AnalyzeForm({ onResult }: AnalyzeFormProps) {
   const [url, setUrl] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
