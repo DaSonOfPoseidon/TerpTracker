@@ -1,0 +1,8 @@
+u_id,lab_id,strain_slug,anon_producer,region,product_category,strain_category,strain_popularity,chemotype,has_cannabs,chemotype_ratio,tot_thc,tot_cbd,tot_cbg,tot_cbc,tot_cbn,tot_thcv,has_terps,total_terps,terp_var,top_terp_f,tot_ocimene,camphene,g_terpinene,tot_nerolidol_ct,humulene,caryophyllene,limonene,linalool,myrcene,bisabolol,b_pinene,a_terpinene,terpinolene,a_pinene
+1,lab1,blue-dream,prod1,west,flower,sativa,high,1,1,20.5,22.5,0.1,0.8,0.05,0.02,0.01,1,2.1,8,myrcene,0.02,0.01,0.005,0.01,0.15,0.25,0.35,0.12,0.55,0.01,0.08,0.005,0.03,0.12
+2,lab1,blue-dream,prod2,west,flower,sativa,high,1,1,21.0,23.0,0.08,0.7,0.04,0.01,0.02,1,2.3,9,myrcene,0.03,0.02,0.006,0.02,0.18,0.28,0.40,0.10,0.60,0.02,0.10,0.004,0.02,0.14
+3,lab2,blue-dream,prod1,west,flower,sativa,high,1,1,19.8,21.0,0.12,0.9,0.06,0.03,0.01,1,1.9,7,myrcene,0.01,0.015,0.004,0.015,0.12,0.22,0.30,0.14,0.50,0.015,0.07,0.006,0.04,0.10
+4,lab1,og-kush,prod3,west,flower,indica,high,1,1,25.0,26.0,0.05,1.0,0.03,0.01,0.005,1,1.8,6,myrcene,0.01,0.01,0.003,0.008,0.20,0.30,0.20,0.18,0.45,0.01,0.06,0.003,0.01,0.08
+5,lab2,sour-diesel,prod4,east,flower,sativa,medium,1,1,18.0,19.5,0.2,0.5,0.02,0.01,0.03,1,2.0,7,caryophyllene,0.015,0.02,0.004,0.012,0.22,0.35,0.28,0.15,0.40,0.01,0.09,0.005,0.18,0.15
+6,lab1,no-terps-strain,prod5,west,flower,hybrid,low,1,1,15.0,16.0,0.3,0.4,0.01,0.005,0.001,0,0.0,0,,,,,,,,,,,,,,,,
+7,lab2,,prod6,west,flower,hybrid,low,1,1,10.0,11.0,0.1,0.3,0.01,0.005,0.001,1,1.5,5,myrcene,0.01,0.01,0.003,0.008,0.10,0.20,0.15,0.10,0.35,0.01,0.05,0.003,0.02,0.06

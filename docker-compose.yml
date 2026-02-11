@@ -48,6 +48,9 @@ services:
 
   frontend:
     build: ./frontend
+    labels:
+      cloudflare-tunnel.enable: "true"
+      cloudflare-tunnel.subdomain: "terps"
     ports:
       - "3000:3000"
     volumes:

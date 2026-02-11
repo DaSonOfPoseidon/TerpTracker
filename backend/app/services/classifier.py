@@ -113,6 +113,12 @@ def classify_terpene_profile(terpenes: Dict[str, float]) -> str:
     if myrcene >= 0.35 or (top_terp == "myrcene" and top_value - myrcene >= 0.10):
         return "BLUE"
 
+    # RED: Balanced myrcene-limonene-caryophyllene (check before PURPLE — more specific)
+    if (myrcene >= 0.20 and limonene >= 0.20 and caryophyllene >= 0.20 and
+        is_within_range([myrcene, limonene, caryophyllene]) and
+        pinene_total <= 0.15 and humulene <= 0.15):
+        return "RED"
+
     # PURPLE: Caryophyllene-dominant with low pinene
     if caryophyllene >= 0.30 and pinene_total <= 0.15:
         return "PURPLE"
@@ -120,12 +126,6 @@ def classify_terpene_profile(terpenes: Dict[str, float]) -> str:
     # YELLOW: Limonene-dominant
     if limonene >= 0.30:
         return "YELLOW"
-
-    # RED: Balanced myrcene-limonene-caryophyllene
-    if (myrcene >= 0.20 and limonene >= 0.20 and caryophyllene >= 0.20 and
-        is_within_range([myrcene, limonene, caryophyllene]) and
-        pinene_total <= 0.15 and humulene <= 0.15):
-        return "RED"
 
     # Fallback: pick nearest by top terpene
     if top_terp == "myrcene":

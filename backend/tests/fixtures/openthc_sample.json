@@ -1,0 +1,9 @@
+[
+  {"id": "001", "name": "Blue Dream", "stub": "bluedream", "type": "sativa"},
+  {"id": "002", "name": "Girl Scout Cookies", "stub": "girlscoutcookies", "type": "hybrid"},
+  {"id": "003", "name": "OG Kush", "stub": "ogkush", "type": "indica"},
+  {"id": "004", "name": "Sour Diesel", "stub": "sourdiesel", "type": "sativa"},
+  {"id": "005", "name": "Jack Herer", "stub": "jackherer", "type": "sativa"},
+  {"id": "006", "name": "", "stub": "emptystrain", "type": null},
+  {"id": "007", "name": "Purple Haze", "stub": "", "type": "sativa"}
+]

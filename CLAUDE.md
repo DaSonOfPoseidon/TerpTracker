@@ -159,22 +159,33 @@ PostgreSQL tables:
 ### Caching Strategy
 
 - **Redis**: 15-minute cache for analysis results, rate limiting state
-- **PostgreSQL**: Long-term storage of 50k+ strain profiles and extraction history
-  - 32,874 profiles from Terpene Profile Parser dataset (auto-imported on first launch)
-  - 21,000+ profiles from previous user searches (page scraping, COAs, APIs)
+- **PostgreSQL**: Long-term storage of strain profiles and extraction history
+  - ~32,874 profiles from Terpene Profile Parser dataset
+  - ~3,088 profiles from Phytochemical Diversity dataset (14 terpenes + 6 cannabinoids)
+  - Thousands of profiles from Cannlytics Cannabis Results (12 US states, lab-tested)
+  - Additional profiles from previous user searches (page scraping, COAs, APIs)
   - Deduplication by normalized strain name
   - Profiles include terpenes, cannabinoids, SDP category, and provenance metadata
+  - OpenTHC Variety Database provides strain name normalization (3,000+ names)
 
 ### Dataset Initialization
 
-On first Docker container launch, `app/data/init_datasets.py` automatically:
-1. Downloads Terpene Profile Parser CSV (7.4MB, 32,874 strains) from GitHub
-2. Parses lab test results for terpenes and cannabinoids
-3. Classifies each strain into SDP categories
-4. Imports into PostgreSQL `profiles` table
-5. Creates `.initialized` marker to prevent re-downloading
+On first Docker container launch, `app/data/init_datasets.py` automatically imports 4 datasets, each with an independent marker file:
 
-**To force re-initialization:** Delete `backend/app/data/downloads/.initialized` and restart container
+1. **[1/4] Terpene Profile Parser** (GitHub) — ~32,874 strains, 9 terpenes + cannabinoids
+2. **[2/4] Phytochemical Diversity** (GitHub) — ~3,088 unique strains averaged from ~90k lab samples, 14 terpenes + 6 cannabinoids (CC0 license)
+3. **[3/4] OpenTHC Variety Database** — 3,000+ strain name mappings for alias-aware lookups (no terpene data, name normalization only)
+4. **[4/4] Cannlytics Cannabis Results** (HuggingFace) — state-by-state lab results from 12 US states (CC BY 4.0). States imported: NY, UT, HI, FL, RI, CT, CO, MA, OR, NV, MD, MI. WA excluded (XLSX only), CA deferred (1.6GB)
+
+Each dataset is independently try/except wrapped — one failure doesn't block others. Markers are per-dataset in `backend/app/data/downloads/`:
+- `.initialized_terpene_parser`
+- `.initialized_phytochem`
+- `.initialized_openthc`
+- `.initialized_cannlytics`
+- `.initialized` (legacy, counts as terpene_parser done)
+
+**To force re-initialization of a specific dataset:** Delete the corresponding `.initialized_*` marker and restart the container.
+**To force full re-initialization:** Delete all `.initialized*` markers in `backend/app/data/downloads/`
 
 ## Notes
 
@@ -186,20 +197,23 @@ On first Docker container launch, `app/data/init_datasets.py` automatically:
 
 ## Data Sources & API Status
 
-**Active:**
+**Active Datasets (auto-imported on first launch):**
+- ✅ Terpene Profile Parser (~32k strains) - Public GitHub dataset
+- ✅ Phytochemical Diversity (~3k strains, 14 terpenes) - GitHub, CC0 license
+- ✅ Cannlytics Cannabis Results (thousands of strains, 12 US states) - HuggingFace, CC BY 4.0
+- ✅ OpenTHC Variety Database (3k+ strain names) - Name normalization only
+
+**Active APIs:**
 - ✅ Cannlytics API (COA parsing + strain data) - Requires API key
-- ✅ Terpene Profile Parser Dataset (32k strains) - Public GitHub dataset
 
 **Offline/Unavailable:**
 - ❌ Kushy API - Free strain database, went offline in 2025
 - ❌ Otreeba API - Commercial API, service appears unavailable (can't create accounts)
 
-**Looking for More Data Sources:**
-We're actively seeking additional cannabis strain databases and APIs. Many previously-available free APIs have gone offline, and commercial alternatives are scarce. If you find active terpene/cannabinoid data APIs or public datasets, please update this documentation and integrate them using the multi-source merging pattern in `analyzer.py`.
-
-**Integration Pattern:**
-1. Create client in `app/services/{api_name}_client.py` following existing patterns
-2. Add to API fallback chain in `analyzer.py` (lines 204-237)
-3. Update merge functions to include new source
-4. Add API status to environment variables
-5. Update documentation
+**Integration Pattern for New Datasets:**
+1. Add parser function in `app/data/init_datasets.py` following existing patterns
+2. Add marker key to `MARKERS` dict and download URL
+3. Add import step in `initialize_datasets()` flow
+4. For runtime APIs: create client in `app/services/{api_name}_client.py`
+5. Add to API fallback chain in `analyzer.py`
+6. Update documentation and tests
