@@ -11,19 +11,28 @@ export function SDPGuide() {
             key={key}
             className="bg-card border border-border rounded-lg p-5 space-y-2"
           >
-            <div className="flex items-center gap-3">
-              <span
-                className="inline-block w-3.5 h-3.5 rounded-full shrink-0"
-                style={{ backgroundColor: cat.color }}
-              />
-              <h3 className="font-heading text-lg font-semibold text-foreground">
-                {cat.name}
-              </h3>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span
+                  className="inline-block w-3.5 h-3.5 rounded-full shrink-0"
+                  style={{ backgroundColor: cat.color }}
+                />
+                <h3 className="font-heading text-lg font-semibold text-foreground">
+                  {cat.name}
+                </h3>
+              </div>
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-foreground/10 text-foreground/60">
+                {cat.traditionalLabel}
+              </span>
             </div>
             <p className="text-sm text-foreground/80">{cat.description}</p>
+            <p className="text-sm italic text-foreground/60">{cat.experienceDescription}</p>
             <p className="text-xs text-muted-foreground">{cat.secondaryNotes}</p>
             <p className="text-xs text-botanical-sage">
               Dominant: {cat.dominantTerpene}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Examples: {cat.exampleStrains.join(", ")}
             </p>
           </div>
         ))}

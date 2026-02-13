@@ -41,6 +41,21 @@ export function ResultCard({ result }: ResultCardProps) {
         </div>
       </div>
 
+      {/* Traditional Label + Insight */}
+      {sdp && (
+        <div className="px-6 py-3 flex flex-wrap items-center gap-3 bg-secondary/20">
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-foreground/10 text-foreground/70">
+            {sdp.traditionalLabel}
+          </span>
+          <span className="text-xs text-muted-foreground italic">
+            Think: {sdp.exampleStrains.join(", ")}
+          </span>
+          <span className="hidden sm:inline text-xs text-muted-foreground">
+            — {sdp.experienceDescription}
+          </span>
+        </div>
+      )}
+
       {/* Summary */}
       <div className="px-6 py-4">
         <p className="text-foreground/80 leading-relaxed">{result.summary}</p>

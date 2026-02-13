@@ -7,6 +7,8 @@ from app.services.classifier import (
     classify_terpene_profile,
     normalize_terpene_profile,
     generate_summary,
+    get_traditional_label,
+    TRADITIONAL_LABELS,
 )
 
 class TestNormalization:
@@ -156,3 +158,59 @@ class TestEdgeCases:
         }
         category = classify_terpene_profile(profile)
         assert category in ["BLUE", "YELLOW", "PURPLE", "GREEN", "ORANGE", "RED"]
+
+
+class TestTraditionalLabels:
+    """Test SDP 'Beyond Indica & Sativa' traditional label mappings."""
+
+    def test_traditional_labels_dict_has_all_categories(self):
+        """All 6 SDP categories have a traditional label."""
+        for cat in ["BLUE", "YELLOW", "PURPLE", "GREEN", "ORANGE", "RED"]:
+            assert cat in TRADITIONAL_LABELS
+
+    def test_traditional_labels_values(self):
+        """Labels match SDP research findings."""
+        assert TRADITIONAL_LABELS["ORANGE"] == "Sativa"
+        assert TRADITIONAL_LABELS["YELLOW"] == "Modern Indica"
+        assert TRADITIONAL_LABELS["PURPLE"] == "Modern Indica"
+        assert TRADITIONAL_LABELS["GREEN"] == "Classic Indica"
+        assert TRADITIONAL_LABELS["BLUE"] == "Classic Indica"
+        assert TRADITIONAL_LABELS["RED"] == "Hybrid"
+
+    def test_get_traditional_label_valid(self):
+        """get_traditional_label returns correct label for known categories."""
+        assert get_traditional_label("ORANGE") == "Sativa"
+        assert get_traditional_label("RED") == "Hybrid"
+        assert get_traditional_label("BLUE") == "Classic Indica"
+
+    def test_get_traditional_label_unknown(self):
+        """get_traditional_label falls back to 'Hybrid' for unknown categories."""
+        assert get_traditional_label("UNKNOWN") == "Hybrid"
+        assert get_traditional_label("") == "Hybrid"
+
+    def test_summary_includes_traditional_label(self):
+        """generate_summary mentions the traditional label."""
+        summary = generate_summary(
+            "Jack Herer",
+            "ORANGE",
+            {"terpinolene": 0.5, "myrcene": 0.3, "ocimene": 0.2}
+        )
+        assert "sativa" in summary.lower()
+
+    def test_summary_traditional_label_for_each_category(self):
+        """Each category's summary includes the appropriate traditional term."""
+        test_cases = {
+            "BLUE": ("myrcene", "classic indica"),
+            "YELLOW": ("limonene", "modern indica"),
+            "PURPLE": ("caryophyllene", "modern indica"),
+            "GREEN": ("alpha_pinene", "classic indica"),
+            "ORANGE": ("terpinolene", "sativa"),
+            "RED": ("myrcene", "hybrid"),
+        }
+        for category, (terp, expected_label) in test_cases.items():
+            summary = generate_summary(
+                "Test Strain",
+                category,
+                {terp: 0.5, "limonene": 0.3}
+            )
+            assert expected_label in summary.lower(), f"{category} summary should contain '{expected_label}'"

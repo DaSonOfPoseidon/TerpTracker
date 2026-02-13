@@ -68,6 +68,7 @@ class AnalyzeUrlResponse(BaseModel):
     terpenes: Dict[str, float] = Field(default_factory=dict, description="Merged terpene profile with percentages from all sources")
     totals: Totals = Field(default_factory=Totals, description="Merged total terpenes and cannabinoids from all sources")
     category: Optional[str] = Field(None, description="SDP category: BLUE|YELLOW|PURPLE|GREEN|ORANGE|RED (null if no terpene data)")
+    traditional_label: Optional[str] = Field(None, description="Traditional label from SDP research: Sativa|Modern Indica|Classic Indica|Hybrid")
     summary: str = Field(..., description="Friendly summary about the profile")
     strain_guess: str = Field(..., description="Normalized strain name")
     evidence: Evidence = Field(..., description="Source and detection metadata")

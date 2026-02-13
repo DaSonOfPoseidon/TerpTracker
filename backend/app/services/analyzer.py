@@ -17,7 +17,7 @@ from app.models.schemas import AnalyzeUrlResponse, Evidence, Totals, DataAvailab
 from app.services.scraper import scrape_url
 from app.services.cannlytics_client import CannlyticsClient
 from app.services.kushy_client import kushy_client
-from app.services.classifier import classify_terpene_profile, generate_summary, generate_cannabinoid_insights
+from app.services.classifier import classify_terpene_profile, generate_summary, generate_cannabinoid_insights, get_traditional_label
 from app.services.profile_cache import profile_cache_service
 from app.utils.normalization import normalize_strain_name
 from app.utils.merging import merge_terpene_data, merge_cannabinoid_data
@@ -244,6 +244,7 @@ class StrainAnalyzer:
             terpenes=merged_terpenes or {},
             totals=merged_totals,
             category=category,
+            traditional_label=get_traditional_label(category) if category else None,
             summary=summary,
             strain_guess=strain_name,
             evidence=Evidence(**evidence_data),

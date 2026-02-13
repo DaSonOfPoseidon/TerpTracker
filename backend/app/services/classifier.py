@@ -18,6 +18,20 @@ from app.core.constants import (
     DOMINANCE_MARGIN,
 )
 
+# Traditional label mappings from SDP "Beyond Indica & Sativa" research
+# Reference: https://straindataproject.org/beyond-indica-and-sativa
+TRADITIONAL_LABELS = {
+    "ORANGE": "Sativa",
+    "YELLOW": "Modern Indica",
+    "PURPLE": "Modern Indica",
+    "GREEN": "Classic Indica",
+    "BLUE": "Classic Indica",
+    "RED": "Hybrid",
+}
+
+def get_traditional_label(category: str) -> str:
+    return TRADITIONAL_LABELS.get(category, "Hybrid")
+
 # Category descriptions for summaries
 CATEGORY_DESCRIPTIONS = {
     "BLUE": "myrcene-forward with an earthy, relaxing profile",
@@ -171,7 +185,8 @@ def generate_summary(strain_name: str, category: str, terpenes: Dict[str, float]
     else:
         terp_detail = ""
 
-    return f"{strain_name}'s composition puts it in the {category} category — expect {description}{terp_detail}."
+    traditional = get_traditional_label(category)
+    return f"{strain_name}'s composition puts it in the {category} category — expect {description}{terp_detail}. In traditional terms, this aligns with a {traditional.lower()} experience."
 
 def generate_cannabinoid_insights(totals) -> List[str]:
     """

@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { BeyondIndicaSativa } from "@/components/BeyondIndicaSativa"
 import { SDPGuide } from "@/components/SDPGuide"
 import { TerpenePanel } from "@/components/TerpenePanel"
 
@@ -18,6 +19,18 @@ export default function LearnPage() {
           Understand the six SDP categories and what each terpene does.
         </p>
       </header>
+
+      <section className="mb-10">
+        <h2 className="font-heading text-2xl font-semibold text-foreground mb-4">
+          Beyond Indica &amp; Sativa
+        </h2>
+        <p className="text-muted-foreground mb-4">
+          How terpene chemistry maps to the labels you already know.
+        </p>
+        <BeyondIndicaSativa />
+      </section>
+
+      <hr className="leaf-divider my-10" />
 
       <section className="mb-10">
         <h2 className="font-heading text-2xl font-semibold text-foreground mb-4">
