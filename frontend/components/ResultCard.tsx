@@ -9,6 +9,7 @@ import { SourceBadge } from "./SourceBadge"
 import { TerpeneRadarChart } from "./TerpeneRadarChart"
 import { DataQualityIndicator } from "./DataQualityIndicator"
 import { CannabinoidInsights } from "./CannabinoidInsights"
+import { ExperiencePreview } from "./ExperiencePreview"
 import { BookOpen } from "lucide-react"
 
 interface ResultCardProps {
@@ -61,6 +62,14 @@ export function ResultCard({ result }: ResultCardProps) {
         <p className="text-foreground/80 leading-relaxed">{result.summary}</p>
       </div>
       <hr className="leaf-divider" />
+
+      {/* Experience Preview */}
+      {result.effects && (
+        <>
+          <ExperiencePreview effects={result.effects} />
+          <hr className="leaf-divider" />
+        </>
+      )}
 
       {/* Terpenes */}
       <div className="px-6 py-4">

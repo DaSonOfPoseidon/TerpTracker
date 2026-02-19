@@ -217,6 +217,25 @@ class ProfileCacheService:
 
         return None
 
+    def get_full_cached_result(self, strain_name: str) -> Optional[dict]:
+        """
+        Get a complete result dict for building an AnalyzeUrlResponse from cached data.
+        Returns dict with strain_name, terpenes, totals, category, source, cached_at
+        or None if not found.
+        """
+        cached = self.get_cached_profile_with_aliases(strain_name)
+        if not cached:
+            return None
+
+        return {
+            'strain_name': strain_name,
+            'terpenes': cached.get('terpenes', {}),
+            'totals': cached.get('totals', Totals()),
+            'category': cached.get('category'),
+            'source': 'database',
+            'cached_at': cached.get('cached_at'),
+        }
+
     def get_all_cached_strains(self, limit: int = 100) -> list[str]:
         """
         Get list of all cached strain names.
@@ -232,6 +251,93 @@ class ProfileCacheService:
         try:
             profiles = db.query(Profile.strain_normalized).limit(limit).all()
             return [p.strain_normalized for p in profiles]
+        finally:
+            db.close()
+
+    def autocomplete_strains(self, query: str, limit: int = 10) -> list[dict]:
+        """
+        Fast prefix-only strain name search for autocomplete.
+        Requires query length >= 2.
+
+        Returns:
+            List of {name, category} dicts
+        """
+        if len(query) < 2:
+            return []
+
+        normalized_query = self.normalize_strain_name(query)
+        db = SessionLocal()
+        try:
+            profiles = db.query(Profile.strain_normalized, Profile.category).filter(
+                Profile.strain_normalized.ilike(f"{normalized_query}%")
+            ).limit(limit).all()
+
+            return [
+                {"name": p.strain_normalized, "category": p.category}
+                for p in profiles
+            ]
+        finally:
+            db.close()
+
+    def search_strains(self, query: str, limit: int = 20) -> list[dict]:
+        """
+        Search strains with prefix match first, then fuzzy matching.
+
+        Returns:
+            List of {name, category, match_score, match_type} dicts
+        """
+        if not query:
+            return []
+
+        normalized_query = self.normalize_strain_name(query)
+        results = []
+        seen_names = set()
+
+        db = SessionLocal()
+        try:
+            # First: prefix matches via SQL ILIKE
+            prefix_matches = db.query(Profile.strain_normalized, Profile.category).filter(
+                Profile.strain_normalized.ilike(f"{normalized_query}%")
+            ).limit(limit).all()
+
+            for p in prefix_matches:
+                results.append({
+                    "name": p.strain_normalized,
+                    "category": p.category,
+                    "match_score": 1.0,
+                    "match_type": "prefix",
+                })
+                seen_names.add(p.strain_normalized)
+
+            # Second: fuzzy matches on remaining candidates if we have room
+            if len(results) < limit:
+                from rapidfuzz import process, fuzz
+
+                # Get candidates not already matched
+                all_names = db.query(Profile.strain_normalized, Profile.category).all()
+                candidates = [(p.strain_normalized, p.category) for p in all_names if p.strain_normalized not in seen_names]
+
+                if candidates:
+                    candidate_names = [c[0] for c in candidates]
+                    category_map = {c[0]: c[1] for c in candidates}
+
+                    fuzzy_results = process.extract(
+                        normalized_query,
+                        candidate_names,
+                        scorer=fuzz.ratio,
+                        limit=limit - len(results),
+                    )
+
+                    for match_name, score, _ in fuzzy_results:
+                        if score >= 60:  # minimum score threshold
+                            results.append({
+                                "name": match_name,
+                                "category": category_map[match_name],
+                                "match_score": round(score / 100, 2),
+                                "match_type": "fuzzy",
+                            })
+
+            return results[:limit]
         finally:
             db.close()
 

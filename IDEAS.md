@@ -5,15 +5,8 @@
 ### Testing & Reliability
 
 - CI/CD pipeline (GitHub Actions) for automated test runs on PR
-- Backend integration tests for API endpoints (currently only unit tests for classifier and dataset init)
-- Frontend component tests with Vitest + Testing Library
 - End-to-end tests with Playwright for the full analysis flow
 - Test coverage reporting and minimum coverage thresholds
-
-### Data Pipeline
-
-- Any new strain analyzed via URL should be saved to our strains DB automatically
-- Grows the database organically from user searches
 
 ### Additional Scraper Support
 
@@ -22,44 +15,7 @@
 - Each parser extracts terpenes, cannabinoids, strain name, and COA links
 - Fallback to generic regex extraction for unknown sites
 
-### Strain Name Search
-
-- Search by strain name directly instead of requiring a URL
-- Leverage the 50k+ strain database for instant lookups
-
-### Autocomplete / Fuzzy Search
-
-- Strain name autocomplete endpoint powered by the 50k+ DB
-- RapidFuzz is already installed but unused in the search path — wire it up
-- Show SDP category color dots in autocomplete suggestions
-- Debounced input with keyboard navigation support
-
 ## Analysis & Classification
-
-### In-Depth Effects Guide
-
-- Go beyond generic terpene effect labels ("relaxing", "uplifting") with nuanced descriptions
-- Factor in the full terpene + cannabinoid profile together, not just individual compounds
-- Describe the likely onset, peak, and duration character (e.g. "creeping onset, heavy body peak, gentle comedown")
-- Include context-specific guidance: daytime vs nighttime, social vs solo, creative vs functional
-- Flag potential negatives based on the profile (e.g. high Myrcene + high THC → couch-lock risk, high Pinene → possible dry mouth)
-- Use terpene ratio interactions, not just dominance — e.g. Limonene tempers Myrcene sedation
-- Could pull from research literature to back up effect claims with citations
-- Show an "Experience Preview" section on the result card summarizing what to expect
-
-### Classification Confidence
-
-- Show a confidence score alongside the SDP category (e.g. "85% BLUE")
-- Currently the classifier returns only the category with no indication of how borderline it is
-- Visualize how close the profile is to adjacent categories
-- Help users understand when a strain sits on the boundary between two types
-
-### Cannabinoid Ratio Analysis
-
-- THC:CBD ratio insights and what they mean for the user
-- Minor cannabinoid highlights (CBG, CBN, THCV) with effect descriptions
-- Currently cannabinoids are displayed but not analyzed beyond raw numbers
-- Entourage effect indicators based on terpene + cannabinoid combinations
 
 ### Strain Recommendations
 

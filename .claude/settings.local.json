@@ -40,7 +40,9 @@
       "Bash(npm:*)",
       "Bash(tsc:*)",
       "Bash(.venv/bin/python:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(.venv/bin/pip list:*)",
+      "Bash(.venv/bin/pip install:*)"
     ],
     "deny": [],
     "ask": []

@@ -59,6 +59,20 @@ class DataAvailability(BaseModel):
     terpene_count: int = 0
     cannabinoid_count: int = 0
 
+# Effects analysis model
+class EffectsAnalysis(BaseModel):
+    overall_character: str = ""
+    onset: str = ""
+    peak: str = ""
+    duration: str = ""
+    best_contexts: List[str] = Field(default_factory=list)
+    potential_negatives: List[str] = Field(default_factory=list)
+    terpene_interactions: List[str] = Field(default_factory=list)
+    experience_summary: str = ""
+    intensity_estimate: str = "Unknown"
+    daytime_score: float = Field(0.5, ge=0.0, le=1.0)
+    body_mind_balance: float = Field(0.5, ge=0.0, le=1.0)
+
 # Request/Response models
 class AnalyzeUrlRequest(BaseModel):
     url: HttpUrl
@@ -74,6 +88,21 @@ class AnalyzeUrlResponse(BaseModel):
     evidence: Evidence = Field(..., description="Source and detection metadata")
     data_available: DataAvailability = Field(default_factory=DataAvailability, description="What data was found")
     cannabinoid_insights: List[str] = Field(default_factory=list, description="Insights from cannabinoid ratios")
+    effects: Optional[EffectsAnalysis] = Field(None, description="Detailed effects analysis")
+
+# Strain search models
+class StrainSearchResult(BaseModel):
+    name: str
+    category: Optional[str] = None
+    match_score: float = 1.0
+    match_type: str = "prefix"  # 'prefix' | 'fuzzy'
+
+class StrainSearchResponse(BaseModel):
+    results: List[StrainSearchResult]
+    total: int
+
+class AnalyzeStrainRequest(BaseModel):
+    strain_name: str
 
 class TerpeneInfo(BaseModel):
     key: str

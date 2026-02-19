@@ -13,7 +13,7 @@ Main analyzer service that coordinates the extraction pipeline:
 import logging
 from typing import Dict, List
 from app.core.constants import MIN_TERPENES_FOR_COMPLETE
-from app.models.schemas import AnalyzeUrlResponse, Evidence, Totals, DataAvailability
+from app.models.schemas import AnalyzeUrlResponse, EffectsAnalysis, Evidence, Totals, DataAvailability
 from app.services.scraper import scrape_url
 from app.services.cannlytics_client import CannlyticsClient
 from app.services.kushy_client import kushy_client
@@ -94,10 +94,10 @@ class StrainAnalyzer:
                         strain_name = coa_data.strain_name
                     break  # Use first successful COA
 
-        # Step 3: Always check database cache for supplemental data
+        # Step 3: Always check database cache for supplemental data (with alias resolution)
         if strain_name:
             logger.debug("Checking database for '%s'...", strain_name)
-            cached_profile = profile_cache_service.get_cached_profile(strain_name)
+            cached_profile = profile_cache_service.get_cached_profile_with_aliases(strain_name)
             if cached_profile:
                 logger.debug("Found cached profile for '%s'", strain_name)
                 if cached_profile['terpenes']:
@@ -182,8 +182,9 @@ class StrainAnalyzer:
             logger.debug("Classified as %s", category)
 
         # Step 7: Save merged results to database for future lookups
-        if ('page' in all_sources or 'coa' in all_sources) and merged_terpenes and category and strain_name:
-            primary_source = 'coa' if 'coa' in all_sources else 'page'
+        if merged_terpenes and category and strain_name:
+            source_priority = ['coa', 'page', 'database', 'api']
+            primary_source = next((s for s in source_priority if s in all_sources), 'unknown')
             logger.debug("Saving merged result to database for '%s' (primary source: %s)", strain_name, primary_source)
             profile_cache_service.save_profile(
                 strain_name=strain_name,
@@ -239,6 +240,39 @@ class StrainAnalyzer:
                                   if getattr(merged_totals, field, None))
         )
 
+        # Step 11: Record extraction history (fire-and-forget)
+        if merged_terpenes and category and strain_name:
+            try:
+                from app.db.base import SessionLocal
+                from app.db.models import Extraction
+                source_priority = ['coa', 'page', 'database', 'api']
+                primary_source = next((s for s in source_priority if s in all_sources), 'unknown')
+                db = SessionLocal()
+                try:
+                    extraction = Extraction(
+                        url=url,
+                        source_used=primary_source,
+                        status='completed',
+                        evidence=evidence_data,
+                    )
+                    db.add(extraction)
+                    db.commit()
+                    logger.debug("Recorded extraction for '%s'", url)
+                except Exception:
+                    db.rollback()
+                finally:
+                    db.close()
+            except Exception as e:
+                logger.debug("Failed to record extraction (non-blocking): %s", e)
+
+        # Step 12: Generate effects profile
+        effects = None
+        if has_terpenes:
+            from app.services.effects_engine import generate_effects_profile
+            effects_data = generate_effects_profile(merged_terpenes, merged_totals, category)
+            if effects_data:
+                effects = EffectsAnalysis(**effects_data)
+
         return AnalyzeUrlResponse(
             sources=all_sources,
             terpenes=merged_terpenes or {},
@@ -249,5 +283,6 @@ class StrainAnalyzer:
             strain_guess=strain_name,
             evidence=Evidence(**evidence_data),
             data_available=data_available,
-            cannabinoid_insights=cannabinoid_insights
+            cannabinoid_insights=cannabinoid_insights,
+            effects=effects,
         )
